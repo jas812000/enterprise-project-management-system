@@ -45,3 +45,11 @@ logs/
 *.swp
 *.swo
 *~
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# CI Quality Gate - Generated Analysis Artifacts
+/quality/analysis/

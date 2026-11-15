@@ -1,0 +1,1291 @@
+# File: .github/workflows/build-and-analyze.yml
+# ==========================================================
+# Build and Analyze (New Gate Engine)
+# ----------------------------------------------------------
+# Quality/security workflow for EPMS.
+#
+# System of record:
+#   quality/CI/gate/
+#
+# Pipeline responsibilities:
+#   1) Execute scanners (SAST/SCA/Secrets)
+#   2) Write raw artifacts to: quality/analysis/raw/
+#   3) Normalize results:       quality/analysis/normalized/normalized.json
+#   4) Evaluate policy:         quality/analysis/evaluated/evaluated.json
+#   5) Enforce merge outcome via gate engine exit code
+#   6) Publish rich report:
+#        - quality/analysis/report.md  (written by report.py)
+#        - Actions Job Summary
+#        - PR comment (single updatable comment, written by report.py)
+#
+# Architecture:
+#   This workflow is ORCHESTRATION ONLY.
+#   - No pass/fail logic lives here (gate.py owns enforcement).
+#   - No report rendering lives here (report.py owns reporting).
+#   - No tool-specific parsing lives here (parsers/ own parsing).
+#
+# IMPORTANT:
+#   - Scanner steps record execution outcomes in status files.
+#   - The gate engine evaluates those outcomes and enforces policy.
+#   - Scanner execution failures must not be treated as clean scans.
+#
+# Scan Configuration:
+#   - Default SCAN_ROOT is "." (repository root).
+#   - An optional repository-root .env file can override SCAN_ROOT.
+#   - Local .env files are ignored by Git and are not automatically
+#     available on GitHub-hosted runners.
+#   - GitHub Actions uses the default unless an .env file is
+#     explicitly provided in the runner workspace.
+#
+# Publication:
+#   - Only summary Markdown and HTML reports are uploaded.
+#   - Raw scanner artifacts and normalized/evaluated JSON remain
+#     internal to the workflow run.
+# ==========================================================
+
+name: Build and Analyze
+
+# ----------------------------------------------------------
+# Trigger Conditions
+# ----------------------------------------------------------
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# ----------------------------------------------------------
+# Default SCAN_ROOT
+# ----------------------------------------------------------
+env:
+  SCAN_ROOT: .
+
+# ----------------------------------------------------------
+# Permissions
+# ----------------------------------------------------------
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------
+      # Step 1: Checkout Repository
+      # ------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------
+      # Step 2: Load Environment Overrides (.env)
+      # ----------------------------------------------------------
+      # If .env exists at the repo root, SCAN_ROOT is read from it.
+      # This is the ONLY mechanism for toggling sandbox vs production.
+      # ----------------------------------------------------------
+      - name: Load .env overrides
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENV_FILE="${GITHUB_WORKSPACE}/.env"
+          if [[ -f "${ENV_FILE}" ]]; then
+            while IFS='=' read -r key value; do
+              [[ -z "${key}" ]] && continue
+              [[ "${key}" =~ ^# ]] && continue
+              key="$(echo "${key}" | xargs)"
+              value="$(echo "${value}" | xargs)"
+              case "${key}" in
+                SCAN_ROOT)
+                  echo "SCAN_ROOT=${value}" >> "$GITHUB_ENV"
+                  echo "Loaded from .env: SCAN_ROOT=${value}"
+                  ;;
+                *)
+                  ;;
+              esac
+            done < "${ENV_FILE}"
+          else
+            echo "No .env file found; using default SCAN_ROOT=${SCAN_ROOT}"
+          fi
+
+      # ------------------------------------------------------
+      # Step 3: Set Up Python Runtime
+      # ------------------------------------------------------
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ------------------------------------------------------
+      # Step 4: Install Python Dependencies
+      # ----------------------------------------------------------
+      # pyyaml   → required by gate.py (policy.yaml parsing)
+      # requests → required by report.py (GitHub API for PR comments)
+      # semgrep  → pinned, installed once here only
+      # pylint   → Python static analysis
+      # bandit   → Python security SAST
+      # ----------------------------------------------------------
+      - name: Install Python Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install \
+            pyyaml \
+            requests \
+            semgrep==1.73.0 \
+            pylint \
+            bandit
+
+      # ------------------------------------------------------
+      # Step 5: Create Analysis Directory Structure
+      # ----------------------------------------------------------
+      # raw/        → native tool outputs (evidence layer)
+      # normalized/ → normalized.json (normalize.py output)
+      # evaluated/  → evaluated.json  (policy_engine.py output)
+      # ----------------------------------------------------------
+      - name: Create Analysis Directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p quality/analysis/raw
+          mkdir -p quality/analysis/normalized
+          mkdir -p quality/analysis/evaluated
+
+      # ======================================================
+      # Step 6: Resolve Scan Roots
+      # ----------------------------------------------------------
+      # Exports to GITHUB_ENV:
+      # ======================================================
+      - name: Resolve scan roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${GITHUB_WORKSPACE}/${SCAN_ROOT}"
+
+          if [[ ! -d "${ROOT}" ]]; then
+            echo "::error::SCAN_ROOT does not exist: ${ROOT}"
+            exit 1
+          fi
+
+          # Java root — directory containing pom.xml or src/main/java
+          JAVA_POM="$(find "${ROOT}" -maxdepth 6 -name pom.xml -print -quit || true)"
+          if [[ -n "${JAVA_POM}" ]]; then
+            JAVA_ROOT="$(dirname "${JAVA_POM}")"
+          else
+            JAVA_SRC="$(find "${ROOT}" -maxdepth 8 -type d -path "*/src/main/java" \
+              -print -quit || true)"
+            JAVA_ROOT="$(dirname "$(dirname "$(dirname "${JAVA_SRC:-/}")")")"
+            [[ "${JAVA_ROOT}" == "/" ]] && JAVA_ROOT=""
+          fi
+
+          # JS root — directory containing package.json (excluding node_modules)
+          JS_ROOT="$(find "${ROOT}" -maxdepth 4 -name package.json \
+            ! -path "*/node_modules/*" -print -quit \
+            | xargs -r dirname || true)"
+
+          # Python root — use RESOLVED_ROOT if any .py files exist
+          PY_COUNT="$(find "${ROOT}" -name "*.py" \
+            ! -path "*/.venv/*" ! -path "*/node_modules/*" | wc -l)"
+          if [[ "${PY_COUNT}" -gt 0 ]]; then
+            PY_ROOT="${ROOT}"
+          else
+            PY_ROOT=""
+          fi
+
+          echo "RESOLVED_ROOT=${ROOT}"         >> "$GITHUB_ENV"
+          echo "JAVA_ROOT=${JAVA_ROOT}"        >> "$GITHUB_ENV"
+          echo "JS_ROOT=${JS_ROOT}"            >> "$GITHUB_ENV"
+          echo "PY_ROOT=${PY_ROOT}"            >> "$GITHUB_ENV"
+
+          echo "SCAN_ROOT      = ${SCAN_ROOT}"
+          echo "RESOLVED_ROOT  = ${ROOT}"
+          echo "JAVA_ROOT      = ${JAVA_ROOT:-<none>}"
+          echo "JS_ROOT        = ${JS_ROOT:-<none>}"
+          echo "PY_ROOT        = ${PY_ROOT:-<none>}"
+
+      # ======================================================
+      # TOOL EXECUTION
+      # ======================================================
+
+      # ------------------------------------------------------
+      # Tool: TruffleHog (Secrets Detection)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/trufflehog.jsonl
+      # ------------------------------------------------------
+
+      - name: Run TruffleHog (Secrets)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/trufflehog.jsonl"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/trufflehog.status.json"
+
+          # Remove artifacts from previous executions.
+          rm -f "${OUT}" "${STATUS}"
+
+          # Empty JSONL is valid after successful execution.
+          : > "${OUT}"
+
+          SCANNER_EXIT=0
+
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/repo" \
+            trufflesecurity/trufflehog:3.82.6 \
+            filesystem "/repo/${SCAN_ROOT}" \
+            --json \
+            --no-verification \
+            >> "${OUT}" || SCANNER_EXIT=$?
+
+          if [[ "${SCANNER_EXIT}" -eq 0 ]]; then
+            printf '{"status":"completed","exit_code":0}\n' \
+              > "${STATUS}"
+
+            echo "TruffleHog completed successfully."
+          else
+            # A failed scan must not retain a misleading artifact.
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"TruffleHog execution failed"}\n' \
+              "${SCANNER_EXIT}" > "${STATUS}"
+
+            echo "::error::TruffleHog execution failed with exit code ${SCANNER_EXIT}."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Gitleaks (Secrets Detection)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/gitleaks.json
+      # ------------------------------------------------------
+
+      - name: Run Gitleaks (Secrets)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/gitleaks.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/gitleaks.status.json"
+          ARCHIVE="${RUNNER_TEMP}/gitleaks.tar.gz"
+          BINARY="${RUNNER_TEMP}/gitleaks"
+
+          rm -f "${OUT}" "${STATUS}" "${ARCHIVE}" "${BINARY}"
+
+          SCANNER_EXIT=0
+
+          # Download the pinned Gitleaks version.
+          if ! curl --fail --silent --show-error --location \
+            --output "${ARCHIVE}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz"; then
+            SCANNER_EXIT=2
+          elif ! tar -xzf "${ARCHIVE}" -C "${RUNNER_TEMP}" gitleaks; then
+            SCANNER_EXIT=2
+          else
+            chmod +x "${BINARY}"
+
+            # Exit code 10 means secrets were detected.
+            # Other nonzero codes mean execution failed.
+            "${BINARY}" detect \
+              --source "${GITHUB_WORKSPACE}/${SCAN_ROOT}" \
+              --report-format json \
+              --report-path "${OUT}" \
+              --no-git \
+              --exit-code 10 \
+              --redact \
+              || SCANNER_EXIT=$?
+          fi
+
+          if [[ "${SCANNER_EXIT}" -eq 0 || "${SCANNER_EXIT}" -eq 10 ]]; then
+            # The report must exist and contain a JSON array.
+            if [[ -f "${OUT}" ]] && \
+              python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); sys.exit(0 if isinstance(data,list) else 1)' "${OUT}"; then
+
+              printf '{"status":"completed","exit_code":%d}\n' \
+                "${SCANNER_EXIT}" > "${STATUS}"
+
+              echo "Gitleaks completed with exit code ${SCANNER_EXIT}."
+            else
+              SCANNER_EXIT=2
+            fi
+          fi
+
+          if [[ "${SCANNER_EXIT}" -ne 0 && "${SCANNER_EXIT}" -ne 10 ]]; then
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Gitleaks execution failed or its report is invalid"}\n' \
+              "${SCANNER_EXIT}" > "${STATUS}"
+
+            echo "::error::Gitleaks execution failed with exit code ${SCANNER_EXIT}."
+          fi
+
+      # ------------------------------------------------------
+      # Toolchain: Java 25
+      # ----------------------------------------------------------
+      # Required by Checkstyle, PMD, and SpotBugs.
+      # ------------------------------------------------------
+      - name: Setup Java 25 (Temurin)
+        if: success() || failure()
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # ------------------------------------------------------
+      # Tool: Checkstyle (Java Style Enforcement)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/checkstyle.xml
+      # ------------------------------------------------------
+
+      - name: Run Checkstyle (EPMS BN1)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_ROOT="${GITHUB_WORKSPACE}"
+          WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
+          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+
+          OUT="${WORK_DIR}/checkstyle.xml"
+          STATUS="${WORK_DIR}/checkstyle.status.json"
+
+          export PYTHON_CMD=python3
+
+          # Remove previous execution artifacts.
+          rm -f "${OUT}" "${STATUS}"
+
+          CHECKSTYLE_EXIT=0
+
+          sh "${REPO_ROOT}/quality/Local_Scans/checks/check_checkstyle.sh" \
+            "${REPO_ROOT}" "${WORK_DIR}" "${TOOLS_DIR}" \
+            || CHECKSTYLE_EXIT=$?
+
+          echo "Checkstyle exit code: ${CHECKSTYLE_EXIT}"
+
+          if [[ "${CHECKSTYLE_EXIT}" -eq 0 || "${CHECKSTYLE_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]]; then
+
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${CHECKSTYLE_EXIT}" > "${STATUS}"
+
+            echo "Checkstyle completed successfully."
+          else
+            # Scanner execution or report generation failed.
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Checkstyle execution or report validation failed"}\n' \
+              "${CHECKSTYLE_EXIT}" > "${STATUS}"
+
+            echo "::error::Checkstyle execution failed or its report is missing."
+          fi
+
+      # ------------------------------------------------------
+      # ------------------------------------------------------
+      # Tool: PMD (Java Source Static Analysis)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/pmd.xml
+      # ------------------------------------------------------
+
+      - name: Run PMD (EPMS BN1)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_ROOT="${GITHUB_WORKSPACE}"
+          WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
+          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+
+          OUT="${WORK_DIR}/pmd.xml"
+          STATUS="${WORK_DIR}/pmd.status.json"
+
+          # Remove artifacts from previous executions.
+          rm -f "${OUT}" "${STATUS}"
+
+          PMD_EXIT=0
+
+          sh "${REPO_ROOT}/quality/Local_Scans/checks/check_pmd.sh" \
+            "${REPO_ROOT}" "${WORK_DIR}" "${TOOLS_DIR}" \
+            || PMD_EXIT=$?
+
+          echo "PMD exit code: ${PMD_EXIT}"
+
+          if [[ "${PMD_EXIT}" -eq 0 || "${PMD_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]]; then
+
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${PMD_EXIT}" > "${STATUS}"
+
+            echo "PMD completed successfully."
+          else
+            # Scanner execution or report validation failed.
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"PMD execution or report validation failed"}\n' \
+              "${PMD_EXIT}" > "${STATUS}"
+
+            echo "::error::PMD execution failed or its report is missing."
+          fi
+
+      # ------------------------------------------------------
+      # ------------------------------------------------------
+      # Tool: SpotBugs (Java Bytecode Static Analysis)
+      # ------------------------------------------------------
+      # Uses the existing EPMS BN1 SpotBugs scanner.
+      # The BN1 script compiles the backend using Maven,
+      # builds its dependency classpath, and validates XML.
+      #
+      # Output: quality/analysis/raw/spotbugs.xml
+      # ------------------------------------------------------
+
+      - name: Run SpotBugs (EPMS BN1)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_ROOT="${GITHUB_WORKSPACE}"
+          WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
+          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+
+          OUT="${WORK_DIR}/spotbugs.xml"
+          STATUS="${WORK_DIR}/spotbugs.status.json"
+
+          # Remove artifacts from previous executions.
+          rm -f "${OUT}" "${STATUS}"
+
+          SPOTBUGS_EXIT=0
+
+          sh "${REPO_ROOT}/quality/Local_Scans/checks/check_spotbugs.sh" \
+            "${REPO_ROOT}" "${WORK_DIR}" "${TOOLS_DIR}" \
+            || SPOTBUGS_EXIT=$?
+
+          echo "SpotBugs exit code: ${SPOTBUGS_EXIT}"
+
+          if [[ "${SPOTBUGS_EXIT}" -eq 0 || "${SPOTBUGS_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]]; then
+
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${SPOTBUGS_EXIT}" > "${STATUS}"
+
+            echo "SpotBugs completed successfully."
+          else
+            # Compilation, scanner execution, or report validation failed.
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"SpotBugs execution or report validation failed"}\n' \
+              "${SPOTBUGS_EXIT}" > "${STATUS}"
+
+            echo "::error::SpotBugs execution failed or its report is missing."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Semgrep (Multi-language SAST)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/semgrep.json
+      # ------------------------------------------------------
+
+      - name: Run Semgrep (SAST)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/semgrep.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/semgrep.status.json"
+
+          # Remove previous execution artifacts.
+          rm -f "${OUT}" "${STATUS}"
+
+          SEMGREP_EXIT=0
+
+          semgrep scan \
+            --config=auto \
+            --error \
+            --json \
+            --output "${OUT}" \
+            "${RESOLVED_ROOT}" \
+            || SEMGREP_EXIT=$?
+
+          echo "Semgrep exit code: ${SEMGREP_EXIT}"
+
+          if [[ "${SEMGREP_EXIT}" -eq 0 || "${SEMGREP_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as report:
+              data = json.load(report)
+
+          valid = (
+              isinstance(data, dict)
+              and isinstance(data.get("results"), list)
+              and all(isinstance(item, dict) for item in data["results"])
+              and isinstance(data.get("errors", []), list)
+              and not data.get("errors")
+          )
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${SEMGREP_EXIT}" > "${STATUS}"
+
+            echo "Semgrep completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Semgrep execution failed or its report is invalid"}\n' \
+              "${SEMGREP_EXIT}" > "${STATUS}"
+
+            echo "::error::Semgrep execution failed or its report is invalid."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Pylint (Python Static Analysis)
+      # ----------------------------------------------------------
+      # Runs only when Python files are found under SCAN_ROOT.
+      # Excludes virtual environments and node_modules.
+      #
+      # Output: quality/analysis/raw/pylint.json
+      # Format: array of message objects
+      # ------------------------------------------------------
+
+      - name: Run Pylint (if Python files found)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/pylint.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/pylint.status.json"
+
+          rm -f "${OUT}" "${STATUS}"
+
+          if [[ -z "${PY_ROOT:-}" ]]; then
+            printf '{"status":"disabled","reason":"No Python scan root was detected"}\n' \
+              > "${STATUS}"
+            echo "Pylint disabled: no Python scan root."
+            exit 0
+          fi
+
+          # Collect Python files, excluding generated/dependency directories.
+          mapfile -t PY_FILES < <(
+            find "${PY_ROOT}" -type f -name "*.py" \
+              ! -path "*/.venv/*" \
+              ! -path "*/venv/*" \
+              ! -path "*/node_modules/*" \
+              ! -path "*/__pycache__/*"
+          )
+
+          if [[ "${#PY_FILES[@]}" -eq 0 ]]; then
+            printf '{"status":"disabled","reason":"No eligible Python files were found"}\n' \
+              > "${STATUS}"
+            echo "Pylint disabled: no eligible Python files."
+            exit 0
+          fi
+
+          echo "Pylint: analyzing ${#PY_FILES[@]} Python file(s)."
+
+          PYLINT_EXIT=0
+
+          pylint "${PY_FILES[@]}" \
+            --output-format=json \
+            > "${OUT}" || PYLINT_EXIT=$?
+
+          echo "Pylint exit code: ${PYLINT_EXIT}"
+
+          if [[ $((PYLINT_EXIT & 32)) -eq 0 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as report:
+              data = json.load(report)
+
+          valid = (
+              isinstance(data, list)
+              and all(isinstance(item, dict) for item in data)
+              and not any(
+                  item.get("type") == "fatal"
+                  for item in data
+              )
+          )
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${PYLINT_EXIT}" > "${STATUS}"
+            echo "Pylint completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Pylint execution failed or its report is invalid"}\n' \
+              "${PYLINT_EXIT}" > "${STATUS}"
+
+            echo "::error::Pylint execution failed or its report is invalid."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Bandit (Python Security SAST)
+      # ----------------------------------------------------------
+      # Runs only when Python files are found under SCAN_ROOT.
+      # Scans recursively from PY_ROOT.
+      #
+      # Output: quality/analysis/raw/bandit.json
+      # Format: {"results": [...], "metrics": {...}}
+      # ------------------------------------------------------
+
+      - name: Run Bandit (if Python files found)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/bandit.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/bandit.status.json"
+
+          rm -f "${OUT}" "${STATUS}"
+
+          if [[ -z "${PY_ROOT:-}" ]]; then
+            printf '{"status":"disabled","reason":"No Python scan root was detected"}\n' \
+              > "${STATUS}"
+            echo "Bandit disabled: no Python scan root."
+            exit 0
+          fi
+
+          mapfile -t PY_FILES < <(
+            find "${PY_ROOT}" -type f -name "*.py" \
+              ! -path "*/.venv/*" \
+              ! -path "*/venv/*" \
+              ! -path "*/node_modules/*" \
+              ! -path "*/__pycache__/*"
+          )
+
+          if [[ "${#PY_FILES[@]}" -eq 0 ]]; then
+            printf '{"status":"disabled","reason":"No eligible Python files were found"}\n' \
+              > "${STATUS}"
+            echo "Bandit disabled: no eligible Python files."
+            exit 0
+          fi
+
+          echo "Bandit: analyzing ${#PY_FILES[@]} Python file(s)."
+
+          BANDIT_EXIT=0
+
+          bandit \
+            -f json \
+            -o "${OUT}" \
+            "${PY_FILES[@]}" \
+            || BANDIT_EXIT=$?
+
+          echo "Bandit exit code: ${BANDIT_EXIT}"
+
+          if [[ "${BANDIT_EXIT}" -eq 0 || "${BANDIT_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as report:
+              data = json.load(report)
+
+          valid = (
+              isinstance(data, dict)
+              and isinstance(data.get("results"), list)
+              and all(isinstance(item, dict) for item in data["results"])
+              and isinstance(data.get("errors", []), list)
+              and not data.get("errors")
+          )
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${BANDIT_EXIT}" > "${STATUS}"
+            echo "Bandit completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Bandit execution failed or its report is invalid"}\n' \
+              "${BANDIT_EXIT}" > "${STATUS}"
+
+            echo "::error::Bandit execution failed or its report is invalid."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: HTMLHint (HTML Static Analysis)
+      # ----------------------------------------------------------
+      # Runs only when HTML files are found under SCAN_ROOT.
+      # Uses mapfile + array to pass files individually to htmlhint,
+      # avoiding the single-string subshell argument bug.
+      #
+      # Output: quality/analysis/raw/htmlhint.json
+      # Format: array of per-file result objects
+      # ------------------------------------------------------
+
+      - name: Run HTMLHint (if HTML files found)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/htmlhint.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/htmlhint.status.json"
+
+          rm -f "${OUT}" "${STATUS}"
+
+          mapfile -t HTML_FILES < <(
+            find "${RESOLVED_ROOT}" -type f -name "*.html" \
+              ! -path "*/node_modules/*" \
+              ! -path "*/.dart_tool/*" \
+              ! -path "*/build/*"
+          )
+
+          if [[ "${#HTML_FILES[@]}" -eq 0 ]]; then
+            printf '{"status":"disabled","reason":"No eligible HTML files were found"}\n' \
+              > "${STATUS}"
+            echo "HTMLHint disabled: no eligible HTML files."
+            exit 0
+          fi
+
+          echo "HTMLHint: analyzing ${#HTML_FILES[@]} HTML file(s)."
+
+          HTMLHINT_EXIT=0
+
+          npx --yes htmlhint \
+            "${HTML_FILES[@]}" \
+            --format json \
+            > "${OUT}" || HTMLHINT_EXIT=$?
+
+          echo "HTMLHint exit code: ${HTMLHINT_EXIT}"
+
+          if [[ "${HTMLHINT_EXIT}" -eq 0 || "${HTMLHINT_EXIT}" -eq 1 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          try:
+              with open(sys.argv[1], encoding="utf-8") as report:
+                  data = json.load(report)
+
+              valid = (
+                  isinstance(data, list)
+                  and all(
+                      isinstance(item, dict)
+                      and isinstance(item.get("messages"), list)
+                      and all(
+                          isinstance(message, dict)
+                          for message in item["messages"]
+                      )
+                      for item in data
+                  )
+              )
+          except (OSError, ValueError, TypeError):
+              valid = False
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${HTMLHINT_EXIT}" > "${STATUS}"
+            echo "HTMLHint completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"HTMLHint execution failed or its report is invalid"}\n' \
+              "${HTMLHINT_EXIT}" > "${STATUS}"
+
+            echo "::error::HTMLHint execution failed or its report is invalid."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Stylelint (CSS/SCSS Static Analysis)
+      # ----------------------------------------------------------
+      # Runs only when CSS or SCSS files are found under SCAN_ROOT.
+      # Installs stylelint-config-standard locally to avoid the
+      # "could not find stylelint-config-standard" npx error.
+      # Uses mapfile + array to pass files individually.
+      #
+      # Output: quality/analysis/raw/stylelint.json
+      # Format: array of per-file result objects
+      # ------------------------------------------------------
+
+      - name: Run Stylelint (if CSS/SCSS files found)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/stylelint.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/stylelint.status.json"
+          TOOLS_DIR="${RUNNER_TEMP}/epms-stylelint"
+          CONFIG="${TOOLS_DIR}/stylelint.config.cjs"
+          STYLELINT="${TOOLS_DIR}/node_modules/.bin/stylelint"
+
+          rm -f "${OUT}" "${STATUS}"
+
+          mapfile -t CSS_FILES < <(
+            find "${RESOLVED_ROOT}" -type f \
+              \( -name "*.css" -o -name "*.scss" \) \
+              ! -path "*/node_modules/*" \
+              ! -path "*/build/*"
+          )
+
+          if [[ "${#CSS_FILES[@]}" -eq 0 ]]; then
+            printf '{"status":"disabled","reason":"No eligible CSS or SCSS files were found"}\n' \
+              > "${STATUS}"
+            echo "Stylelint disabled: no eligible CSS/SCSS files."
+            exit 0
+          fi
+
+          echo "Stylelint: analyzing ${#CSS_FILES[@]} CSS/SCSS file(s)."
+
+          STYLELINT_EXIT=0
+
+          mkdir -p "${TOOLS_DIR}"
+
+          if ! npm install \
+            --prefix "${TOOLS_DIR}" \
+            --no-save \
+            --no-audit \
+            --no-fund \
+            stylelint \
+            stylelint-config-standard; then
+            STYLELINT_EXIT=2
+          else
+            printf "module.exports = { extends: ['stylelint-config-standard'] };\n" \
+              > "${CONFIG}"
+
+            "${STYLELINT}" \
+              "${CSS_FILES[@]}" \
+              --config "${CONFIG}" \
+              --formatter json \
+              > "${OUT}" || STYLELINT_EXIT=$?
+          fi
+
+          echo "Stylelint exit code: ${STYLELINT_EXIT}"
+
+          if [[ "${STYLELINT_EXIT}" -eq 0 || "${STYLELINT_EXIT}" -eq 2 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          try:
+              with open(sys.argv[1], encoding="utf-8") as report:
+                  data = json.load(report)
+
+              valid = (
+                  isinstance(data, list)
+                  and all(
+                      isinstance(item, dict)
+                      and isinstance(item.get("warnings"), list)
+                      and all(
+                          isinstance(warning, dict)
+                          for warning in item["warnings"]
+                      )
+                      and not item.get("parseErrors")
+                      and not item.get("invalidOptionWarnings")
+                      and not item.get("deprecations")
+                      for item in data
+                  )
+              )
+          except (OSError, ValueError, TypeError):
+              valid = False
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":%d}\n' \
+              "${STYLELINT_EXIT}" > "${STATUS}"
+            echo "Stylelint completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Stylelint execution failed or its report is invalid"}\n' \
+              "${STYLELINT_EXIT}" > "${STATUS}"
+
+            echo "::error::Stylelint execution failed or its report is invalid."
+          fi
+
+      # ------------------------------------------------------
+      # Tool: Trivy (Container + Filesystem SCA)
+      # ----------------------------------------------------------
+      # Scans the filesystem for known CVEs across all ecosystems:
+      # Java (pom.xml), Python (requirements.txt),
+      # Node (package.json), and OS packages.
+      #
+      # Output: quality/analysis/raw/trivy.json
+      # Format: {"Results": [{Target, Type, Vulnerabilities: [...]}]}
+      # ------------------------------------------------------
+
+      - name: Run Trivy (Filesystem SCA)
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/trivy.json"
+          STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/trivy.status.json"
+          TOOL_DIR="${RUNNER_TEMP}/epms-trivy"
+          VERSION="0.76.2"
+          ARCHIVE="trivy_${VERSION}_Linux-64bit.tar.gz"
+          BASE_URL="https://github.com/aquasecurity/trivy/releases/download/v${VERSION}"
+          TRIVY_EXIT=0
+
+          rm -f "${OUT}" "${STATUS}"
+          mkdir -p "${TOOL_DIR}"
+
+          if ! curl -fL --retry 3 \
+            -o "${TOOL_DIR}/${ARCHIVE}" \
+            "${BASE_URL}/${ARCHIVE}"; then
+            TRIVY_EXIT=1
+          fi
+
+          if [[ "${TRIVY_EXIT}" -eq 0 ]]; then
+            if ! curl -fL --retry 3 \
+              -o "${TOOL_DIR}/checksums.txt" \
+              "${BASE_URL}/trivy_${VERSION}_checksums.txt"; then
+              TRIVY_EXIT=1
+            fi
+          fi
+
+          if [[ "${TRIVY_EXIT}" -eq 0 ]]; then
+            if ! (
+              cd "${TOOL_DIR}"
+              grep -F "  ${ARCHIVE}" checksums.txt \
+                | sha256sum --check --status
+            ); then
+              TRIVY_EXIT=1
+            fi
+          fi
+
+          if [[ "${TRIVY_EXIT}" -eq 0 ]]; then
+            if ! tar -xzf "${TOOL_DIR}/${ARCHIVE}" \
+              -C "${TOOL_DIR}" trivy; then
+              TRIVY_EXIT=1
+            fi
+          fi
+
+          if [[ "${TRIVY_EXIT}" -eq 0 ]]; then
+            "${TOOL_DIR}/trivy" fs \
+              "${RESOLVED_ROOT}" \
+              --format json \
+              --output "${OUT}" \
+              --exit-code 0 \
+              --scanners vuln \
+              --ignore-unfixed \
+              || TRIVY_EXIT=$?
+          fi
+
+          echo "Trivy exit code: ${TRIVY_EXIT}"
+
+          if [[ "${TRIVY_EXIT}" -eq 0 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          try:
+              with open(sys.argv[1], encoding="utf-8") as report:
+                  data = json.load(report)
+
+              valid = (
+                  isinstance(data, dict)
+                  and isinstance(data.get("Results"), list)
+                  and all(
+                      isinstance(item, dict)
+                      and isinstance(item.get("Target"), str)
+                      and (
+                          item.get("Vulnerabilities") is None
+                          or (
+                              isinstance(item["Vulnerabilities"], list)
+                              and all(
+                                  isinstance(vulnerability, dict)
+                                  for vulnerability in item["Vulnerabilities"]
+                              )
+                          )
+                      )
+                      for item in data["Results"]
+                  )
+              )
+          except (OSError, ValueError, TypeError):
+              valid = False
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":0}\n' \
+              > "${STATUS}"
+            echo "Trivy completed successfully."
+          else
+            rm -f "${OUT}"
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Trivy installation, execution, or report validation failed"}\n' \
+              "${TRIVY_EXIT}" > "${STATUS}"
+
+            echo "::error::Trivy installation, execution, or report validation failed."
+          fi
+
+      # ------------------------------------------------------
+      # Diagnostic — Check NVD API Key presence
+      # ------------------------------------------------------
+      - name: Diagnostic — NVD API Key presence
+        if: success() || failure()
+        shell: bash
+        run: |
+          if [[ -n "${NVD_KEY}" ]]; then
+            echo "NVD_API_KEY is set (length: ${#NVD_KEY} chars)"
+          else
+            echo "::warning::NVD_API_KEY is NOT set or empty"
+          fi
+        env:
+          NVD_KEY: ${{ secrets.NVD_API_KEY }}
+
+      # ------------------------------------------------------
+      # Cache: OWASP Dependency-Check NVD database
+      # ------------------------------------------------------
+
+      - name: Cache Dependency-Check data
+        if: success() || failure()
+        uses: actions/cache@v4
+        with:
+          path: quality/analysis/dc-data
+          key: dependency-check-v13-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-v13-${{ runner.os }}-
+
+      # ------------------------------------------------------
+      # Tool: OWASP Dependency-Check (SCA)
+      # ----------------------------------------------------------
+      # Output: quality/analysis/raw/dependency-check-report.json
+      # ------------------------------------------------------
+
+      - name: Run OWASP Dependency-Check (SCA)
+        if: success() || failure()
+        shell: bash
+        env:
+          NVD_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          OUT_DIR="${GITHUB_WORKSPACE}/quality/analysis/raw"
+          OUT="${OUT_DIR}/dependency-check-report.json"
+          STATUS="${OUT_DIR}/dependency_check.status.json"
+          DATA_DIR="${GITHUB_WORKSPACE}/quality/analysis/dc-data"
+          TOOL_DIR="${RUNNER_TEMP}/epms-dependency-check"
+          VERSION="13.0.0"
+          DC_EXIT=0
+
+          rm -f "${OUT}" "${STATUS}"
+          mkdir -p "${OUT_DIR}" "${DATA_DIR}" "${TOOL_DIR}"
+
+          if [[ -z "${NVD_KEY}" ]]; then
+            echo "::error::NVD_API_KEY is missing."
+            DC_EXIT=1
+          fi
+
+          if [[ "${DC_EXIT}" -eq 0 ]]; then
+            if ! curl -fL --retry 3 \
+              -o "${TOOL_DIR}/dependency-check.zip" \
+              "https://github.com/dependency-check/DependencyCheck/releases/download/v${VERSION}/dependency-check-${VERSION}-release.zip"; then
+              DC_EXIT=1
+            fi
+          fi
+
+          if [[ "${DC_EXIT}" -eq 0 ]]; then
+            if ! unzip -q \
+              "${TOOL_DIR}/dependency-check.zip" \
+              -d "${TOOL_DIR}"; then
+              DC_EXIT=1
+            fi
+          fi
+
+          if [[ "${DC_EXIT}" -eq 0 ]]; then
+            "${TOOL_DIR}/dependency-check/bin/dependency-check.sh" \
+              --project "EPMS" \
+              --scan "${RESOLVED_ROOT}" \
+              --format JSON \
+              --out "${OUT_DIR}" \
+              --data "${DATA_DIR}" \
+              --nvdApiKey "${NVD_KEY}" \
+              --nvdApiDelay 6000 \
+              --disableAssembly \
+              --disableOssIndex \
+              || DC_EXIT=$?
+          fi
+
+          echo "Dependency-Check exit code: ${DC_EXIT}"
+
+          if [[ "${DC_EXIT}" -eq 0 ]] \
+            && [[ -s "${OUT}" ]] \
+            && python3 - "${OUT}" <<'PY'
+          import json
+          import sys
+
+          try:
+              with open(sys.argv[1], encoding="utf-8") as report:
+                  data = json.load(report)
+
+              valid = (
+                  isinstance(data, dict)
+                  and isinstance(data.get("dependencies"), list)
+                  and all(
+                      isinstance(dependency, dict)
+                      and (
+                          "vulnerabilities" not in dependency
+                          or (
+                              isinstance(dependency["vulnerabilities"], list)
+                              and all(
+                                  isinstance(vulnerability, dict)
+                                  for vulnerability in dependency["vulnerabilities"]
+                              )
+                          )
+                      )
+                      for dependency in data["dependencies"]
+                  )
+              )
+          except (OSError, ValueError, TypeError):
+              valid = False
+
+          sys.exit(0 if valid else 1)
+          PY
+          then
+            printf '{"status":"completed","exit_code":0}\n' \
+              > "${STATUS}"
+            echo "Dependency-Check completed successfully."
+          else
+            rm -f "${OUT}"
+
+            # A successful process exit does not guarantee a valid report.
+            # Record a nonzero exit code when validation fails.
+            if [[ "${DC_EXIT}" -eq 0 ]]; then
+              DC_EXIT=1
+            fi
+
+            printf '{"status":"failed","exit_code":%d,"reason":"Dependency-Check installation, execution, database update, or report validation failed"}\n' \
+              "${DC_EXIT}" > "${STATUS}"
+
+            echo "::error::Dependency-Check failed; the quality gate must evaluate this failure."
+          fi
+
+      # ======================================================
+      # GATE ENGINE + REPORTING
+      # ======================================================
+
+      # ------------------------------------------------------
+      # Step 7: Run Quality Gate Engine
+      # ----------------------------------------------------------
+      # Exit codes:
+      #   0 → all policy checks passed (merge allowed)
+      #   1 → one or more policy checks failed (merge blocked)
+      # ------------------------------------------------------
+
+      - name: Run Quality Gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m quality.CI.gate.gate
+
+      # ------------------------------------------------------
+      # Step 8: Generate Report
+      # ------------------------------------------------------
+      - name: Generate Report
+        if: always()
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER:    ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          python -m quality.CI.gate.report.report
+
+      # ------------------------------------------------------
+      # Step 9: Publish report.md to Actions Job Summary
+      # ------------------------------------------------------
+      - name: Publish Report to Actions Summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPORT_PATH="quality/analysis/report.md"
+          if [[ -f "${REPORT_PATH}" ]]; then
+            cat "${REPORT_PATH}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::report.md not found at ${REPORT_PATH}; nothing to publish."
+            echo "Report generation failed or was skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ------------------------------------------------------
+      # Step 10: Diagnostic — Raw Artifact Inventory
+      # ------------------------------------------------------
+      # Display filenames and sizes only.
+      # Never print raw scanner findings into CI logs.
+      # ------------------------------------------------------
+      - name: Diagnostic — Raw Artifact Inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RAW_DIR="quality/analysis/raw"
+
+          echo "=== Raw Artifact Inventory ==="
+
+          if [[ ! -d "${RAW_DIR}" ]]; then
+            echo "::warning::Raw artifact directory does not exist."
+            exit 0
+          fi
+
+          python3 - "${RAW_DIR}" <<'PY'
+          from pathlib import Path
+          import sys
+
+          raw_dir = Path(sys.argv[1])
+
+          files = sorted(
+              path for path in raw_dir.iterdir()
+              if path.is_file()
+          )
+
+          if not files:
+              print("No raw artifacts found.")
+          else:
+              for path in files:
+                  print(f"{path.name}: {path.stat().st_size} bytes")
+          PY
+
+      # ------------------------------------------------------
+      # Step 11: Set SHORT_SHA
+      # ------------------------------------------------------
+      - name: Set SHORT_SHA
+        if: always()
+        id: sha
+        shell: bash
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------
+      # Step 12: Upload Analysis Artifacts
+      # ------------------------------------------------------
+
+      - name: Upload Analysis Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_number }}_${{ steps.sha.outputs.short_sha }}_quality_analysis_report
+          path: |
+            quality/analysis/report.md
+            quality/analysis/report.html
+          if-no-files-found: warn
+          retention-days: 7
