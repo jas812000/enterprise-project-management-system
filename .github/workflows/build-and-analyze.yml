@@ -1333,35 +1333,22 @@ jobs:
         run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       # ------------------------------------------------------
-      # Step 12: Upload Analysis Artifacts
+      # Step 12: Upload Complete Quality Analysis Package
       # ------------------------------------------------------
-
-      - name: Upload Analysis Artifacts
+      # Preserve CareConnect-style evidence in one downloadable
+      # artifact, including raw reports even when the gate fails.
+      - name: Upload Complete Quality Analysis Package
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_number }}_${{ steps.sha.outputs.short_sha }}_quality_analysis_report
           path: |
+            quality/analysis/raw/
+            quality/analysis/normalized/
+            quality/analysis/evaluated/
+            quality/analysis/human/
             quality/analysis/report.md
             quality/analysis/report.html
-          if-no-files-found: warn
-          retention-days: 7
-
-      # ------------------------------------------------------
-      # Step 13: Upload Diagnostic Report
-      # ------------------------------------------------------
-      # Detailed findings are retained separately from the
-      # published summary reports.
-      #
-      # The diagnostic report is sanitized by report.py.
-      # Raw scanner artifacts are never uploaded here.
-      # ------------------------------------------------------
-
-      - name: Upload Diagnostic Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.run_number }}_${{ steps.sha.outputs.short_sha }}_quality_diagnostic_report
-          path: quality/analysis/diagnostic-report.html
+            quality/analysis/diagnostic-report.html
           if-no-files-found: warn
           retention-days: 7
