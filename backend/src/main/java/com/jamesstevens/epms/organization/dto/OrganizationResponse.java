@@ -36,4 +36,5 @@ public record OrganizationResponse(
 
         long version
 
-) {}
+) {
+}

@@ -22,4 +22,5 @@ public record UpdateOrganizationRequest(
 
         String description
 
-) {}
+) {
+}

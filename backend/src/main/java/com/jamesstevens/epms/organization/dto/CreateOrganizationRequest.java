@@ -22,4 +22,5 @@ public record CreateOrganizationRequest(
 
         String description
 
-) {}
+) {
+}

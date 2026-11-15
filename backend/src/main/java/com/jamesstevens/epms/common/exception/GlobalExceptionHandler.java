@@ -27,7 +27,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final Logger logger =
+    private static final Logger LOGGER =
             LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
@@ -150,7 +150,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception exception) {
 
         // Record the exception and stack trace in application logs.
-        logger.error("An unexpected application error occurred", exception);
+        LOGGER.error("An unexpected application error occurred", exception);
 
         // Return a generic message without exposing internal details.
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
