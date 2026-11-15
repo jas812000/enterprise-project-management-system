@@ -1,0 +1,13 @@
+# Downloaded scanner distributions and binaries
+/tools/
+
+# Generated reports and working artifacts
+/reports/
+
+# Python bytecode and cache directories
+__pycache__/
+*.py[cod]
+
+# Local temporary files
+*.tmp
+*.temp

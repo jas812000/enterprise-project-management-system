@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# EPMS Local Quality Gate — Pre-Commit Hook
+# Blocks commits when quality checks fail or cannot execute.
+#
+# Setup:
+#   git config core.hooksPath quality/Local_Scans/hooks
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+CHECK_SCRIPT="${REPO_ROOT}/quality/Local_Scans/run-local-checks.sh"
+
+if [ ! -f "${CHECK_SCRIPT}" ]; then
+  echo "ERROR: EPMS quality gate runner not found: ${CHECK_SCRIPT}" >&2
+  exit 2
+fi
+
+if sh "${CHECK_SCRIPT}"; then
+  echo "EPMS quality gate passed."
+else
+  STATUS=$?
+  echo "ERROR: EPMS quality gate returned exit code ${STATUS}." >&2
+  echo "Commit blocked." >&2
+  exit 1
+fi
+
+exit 0

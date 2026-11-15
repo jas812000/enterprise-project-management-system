@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class EpmsApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(EpmsApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(EpmsApplication.class, args);
+    }
 }

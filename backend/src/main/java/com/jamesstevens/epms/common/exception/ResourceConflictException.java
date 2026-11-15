@@ -1,5 +1,6 @@
-
 package com.jamesstevens.epms.common.exception;
+
+import java.io.Serial;
 
 /**
  * Indicates that an application operation conflicts with
@@ -9,6 +10,9 @@ package com.jamesstevens.epms.common.exception;
  * into an HTTP 409 Conflict response.</p>
  */
 public class ResourceConflictException extends RuntimeException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates an exception with a descriptive conflict message.

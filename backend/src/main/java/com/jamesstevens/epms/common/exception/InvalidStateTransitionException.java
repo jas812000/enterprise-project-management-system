@@ -1,5 +1,7 @@
 package com.jamesstevens.epms.common.exception;
 
+import java.io.Serial;
+
 /**
  * Indicates that a requested lifecycle state transition
  * violates an application's business rules.
@@ -8,6 +10,9 @@ package com.jamesstevens.epms.common.exception;
  * into an HTTP 409 Conflict response.</p>
  */
 public class InvalidStateTransitionException extends RuntimeException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates an exception describing an invalid state transition.
