@@ -139,6 +139,7 @@ def build_summary_rows(all_results: list[dict]) -> str:
 def build_tool_sections(
     blocking_results: list[dict],
     non_blocking_results: list[dict],
+    commit_url: str = "",
 ) -> tuple[str, str]:
     """
     Render the enforced and advisory tool sections.
@@ -156,12 +157,18 @@ def build_tool_sections(
         HTML for enforced-tool sections and advisory-tool sections.
     """
     blocking_sections = (
-        "\n".join(tool_section(result) for result in blocking_results)
+        "\n".join(
+            tool_section(result, commit_url)
+            for result in blocking_results
+        )
         or "<p><em>No enforced tools configured.</em></p>"
     )
 
     non_blocking_sections = (
-        "\n".join(tool_section(result) for result in non_blocking_results)
+        "\n".join(
+            tool_section(result, commit_url)
+            for result in non_blocking_results
+        )
         or "<p><em>No advisory tools configured.</em></p>"
     )
 

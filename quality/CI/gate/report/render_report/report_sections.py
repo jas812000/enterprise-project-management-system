@@ -24,10 +24,13 @@ def tool_findings_html(
     findings: list[dict],
     reason: str,
     normalized: dict,
+    commit_url: str = "",
 ) -> str:
     """Render the findings section for a tool result."""
     if findings:
-        rows = "\n".join(finding_row(f) for f in findings)
+        rows = "\n".join(
+            finding_row(f, commit_url) for f in findings
+        )
         return f"""
         <table>
             <thead><tr>
@@ -72,7 +75,10 @@ def tool_findings_html(
     return "<p><em>No findings detected.</em></p>"
 
 
-def tool_section(result: dict) -> str:
+def tool_section(
+    result: dict,
+    commit_url: str = "",
+) -> str:
     """Render a full tool detail section."""
 
     tool_raw = str(result.get("tool", "unknown"))
@@ -92,7 +98,12 @@ def tool_section(result: dict) -> str:
     status_html, header_color = tool_status(reason, violation)
     role_html = tool_role(blocking)
     reason_html = tool_reason_html(reason)
-    findings_html = tool_findings_html(findings, reason, normalized)
+    findings_html = tool_findings_html(
+        findings,
+        reason,
+        normalized,
+        commit_url,
+    )
     back_link = '<a href="#tool-results-summary" style="font-size:0.8em;color:#2980b9;text-decoration:none;">↑ Back to summary</a>'
 
     return f"""

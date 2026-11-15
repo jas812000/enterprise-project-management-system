@@ -38,9 +38,11 @@
 #     explicitly provided in the runner workspace.
 #
 # Publication:
-#   - Only summary Markdown and HTML reports are uploaded.
-#   - Raw scanner artifacts and normalized/evaluated JSON remain
-#     internal to the workflow run.
+#   - Summary Markdown and HTML reports are uploaded together.
+#   - A separate sanitized diagnostic HTML report is uploaded
+#     as a GitHub Actions artifact with seven-day retention.
+#   - Raw scanner artifacts and normalized/evaluated JSON are
+#     not uploaded.
 # ==========================================================
 
 name: Build and Analyze
@@ -545,7 +547,46 @@ jobs:
           elif not isinstance(data.get("errors", []), list):
               print("invalid_errors_array")
           elif data.get("errors"):
-              print("scanner_reported_errors")
+            from collections import Counter
+
+            errors = data["errors"]
+
+            allowed_error_types = {
+            "SemgrepError",
+            "InvalidRuleSchemaError",
+            "InvalidRuleError",
+            "SemgrepCoreError",
+            "Timeout",
+            "OutOfMemory",
+          }
+
+            error_types = Counter()
+
+            for error in errors:
+              if not isinstance(error, dict):
+                category = "invalid_error_entry"
+              else:
+                reported_type = error.get("type")
+
+                if isinstance(reported_type, str) and reported_type in allowed_error_types:
+                  category = reported_type
+                else:
+                  category = "other"
+
+              error_types[category] += 1
+
+            print("scanner_reported_errors", file=sys.stdout)
+
+            print(
+            f"Semgrep reported {len(errors)} scanner error(s).",
+            file=sys.stderr,
+            )
+
+            for category, count in sorted(error_types.items()):
+              print(
+              f"Semgrep error type: {category}; count: {count}",
+                    file=sys.stderr,
+                )
           else:
               print("valid")
           PY
@@ -1304,5 +1345,24 @@ jobs:
           path: |
             quality/analysis/report.md
             quality/analysis/report.html
+          if-no-files-found: warn
+          retention-days: 7
+
+      # ------------------------------------------------------
+      # Step 13: Upload Diagnostic Report
+      # ------------------------------------------------------
+      # Detailed findings are retained separately from the
+      # published summary reports.
+      #
+      # The diagnostic report is sanitized by report.py.
+      # Raw scanner artifacts are never uploaded here.
+      # ------------------------------------------------------
+
+      - name: Upload Diagnostic Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_number }}_${{ steps.sha.outputs.short_sha }}_quality_diagnostic_report
+          path: quality/analysis/diagnostic-report.html
           if-no-files-found: warn
           retention-days: 7

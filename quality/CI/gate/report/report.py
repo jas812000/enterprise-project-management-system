@@ -30,14 +30,16 @@ from copy import deepcopy
 from quality.CI.gate.report.report_github import post_or_update_pr_comment
 from quality.CI.gate.report.report_html import build_html_report
 from quality.CI.gate.report.report_md import build_markdown_report
-
+from quality.CI.gate.report.report_diagnostics import (
+    prepare_diagnostic_document,
+)
 
 ANALYSIS_DIR = Path("quality/analysis")
 EVALUATED_FILE = ANALYSIS_DIR / "evaluated" / "evaluated.json"
 NORMALIZED_FILE = ANALYSIS_DIR / "normalized" / "normalized.json"
 REPORT_MD_FILE = ANALYSIS_DIR / "report.md"
 REPORT_HTML_FILE = ANALYSIS_DIR / "report.html"
-
+DIAGNOSTIC_HTML_FILE = ANALYSIS_DIR / "diagnostic-report.html"
 
 def _get_env() -> dict:
     """
@@ -109,6 +111,26 @@ def generate_report() -> None:
     REPORT_HTML_FILE.write_text(html_body, encoding="utf-8")
 
     print(f"[report] report.html written to: {REPORT_HTML_FILE}")
+
+    # Generate a separate detailed diagnostic report.
+    # The existing summary report remains unchanged.
+    diagnostic_doc = prepare_diagnostic_document(evaluated_doc)
+
+    diagnostic_html = build_html_report(
+         diagnostic_doc,
+         env,
+         link_findings=True,
+     )
+
+    DIAGNOSTIC_HTML_FILE.write_text(
+        diagnostic_html,
+        encoding="utf-8",
+    )
+
+    print(
+        f"[report] Diagnostic report written to: "
+        f"{DIAGNOSTIC_HTML_FILE}"
+    )
 
     if env["event_name"] == "pull_request" and env["pr_number"]:
         post_or_update_pr_comment(md_body, env)

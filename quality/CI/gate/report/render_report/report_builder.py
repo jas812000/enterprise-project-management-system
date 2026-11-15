@@ -25,7 +25,12 @@ from quality.CI.gate.report.render_report.report_blocks import (
 )
 
 
-def build_html_report(evaluated_doc: dict, env: dict) -> str:
+def build_html_report(
+    evaluated_doc: dict,
+    env: dict,
+    *,
+    link_findings: bool = False,
+) -> str:
     """
     Build the complete HTML report from evaluated results.
 
@@ -117,6 +122,7 @@ def build_html_report(evaluated_doc: dict, env: dict) -> str:
     blocking_sections, non_blocking_sections = build_tool_sections(
         blocking_results,
         non_blocking_results,
+        commit_url if link_findings else "",
     )
 
     # ----------------------------------------------------------
