@@ -514,37 +514,54 @@ jobs:
 
           echo "Semgrep exit code: ${SEMGREP_EXIT}"
 
-          if [[ "${SEMGREP_EXIT}" -eq 0 || "${SEMGREP_EXIT}" -eq 1 ]] \
-            && [[ -s "${OUT}" ]] \
-            && python3 - "${OUT}" <<'PY'
+          # Validate execution status separately from report integrity.
+          SEMGREP_VALIDATION=""
+
+          if [[ "${SEMGREP_EXIT}" -ne 0 && "${SEMGREP_EXIT}" -ne 1 ]]; then
+            SEMGREP_VALIDATION="unexpected_exit_code"
+
+          elif [[ ! -s "${OUT}" ]]; then
+            SEMGREP_VALIDATION="missing_or_empty_report"
+
+          else
+            SEMGREP_VALIDATION="$(
+              python3 - "${OUT}" <<'PY'
           import json
           import sys
 
-          with open(sys.argv[1], encoding="utf-8") as report:
-              data = json.load(report)
+          try:
+              with open(sys.argv[1], encoding="utf-8") as report:
+                  data = json.load(report)
+          except (OSError, ValueError, UnicodeError):
+              print("invalid_json")
+              sys.exit(0)
 
-          valid = (
-              isinstance(data, dict)
-              and isinstance(data.get("results"), list)
-              and all(isinstance(item, dict) for item in data["results"])
-              and isinstance(data.get("errors", []), list)
-              and not data.get("errors")
-          )
-
-          sys.exit(0 if valid else 1)
+          if not isinstance(data, dict):
+              print("invalid_top_level_structure")
+          elif not isinstance(data.get("results"), list):
+              print("invalid_results_array")
+          elif not all(isinstance(item, dict) for item in data["results"]):
+              print("invalid_result_entry")
+          elif not isinstance(data.get("errors", []), list):
+              print("invalid_errors_array")
+          elif data.get("errors"):
+              print("scanner_reported_errors")
+          else:
+              print("valid")
           PY
-          then
+            )" || SEMGREP_VALIDATION="validation_script_error"
+          fi
+
+          if [[ "${SEMGREP_VALIDATION}" == "valid" ]]; then
             printf '{"status":"completed","exit_code":%d}\n' \
               "${SEMGREP_EXIT}" > "${STATUS}"
 
             echo "Semgrep completed successfully."
           else
-            rm -f "${OUT}"
+            printf '{"status":"failed","exit_code":%d,"reason":"%s"}\n' \
+              "${SEMGREP_EXIT}" "${SEMGREP_VALIDATION}" > "${STATUS}"
 
-            printf '{"status":"failed","exit_code":%d,"reason":"Semgrep execution failed or its report is invalid"}\n' \
-              "${SEMGREP_EXIT}" > "${STATUS}"
-
-            echo "::error::Semgrep execution failed or its report is invalid."
+            echo "::error::Semgrep validation failed: ${SEMGREP_VALIDATION}"
           fi
 
       # ------------------------------------------------------
