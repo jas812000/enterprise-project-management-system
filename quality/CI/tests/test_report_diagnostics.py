@@ -778,5 +778,95 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertNotIn(self.secret, html)
 
 
+    def test_semgrep_errors_render_alongside_findings(self):
+        evaluated = deepcopy(self.evaluated)
+        semgrep = deepcopy(evaluated["blocking_results"][1])
+        semgrep["tool"] = "semgrep"
+        semgrep["normalized"]["runtime_error"] = True
+        semgrep["normalized"]["metadata"] = {
+            "scanner_errors": [
+                {
+                    "type": "ParseError",
+                    "file": "backend/src/App.java",
+                    "line": 27,
+                },
+                {
+                    "type": "Timeout",
+                    "file": "backend/src/Slow.java",
+                    "line": 81,
+                },
+            ]
+        }
+
+        evaluated["blocking_results"].append(semgrep)
+
+        diagnostic = prepare_diagnostic_document(evaluated)
+        html = build_html_report(diagnostic, self.env)
+
+        self.assertIn("Semgrep Scanner Errors (2)", html)
+        self.assertIn("ParseError", html)
+        self.assertIn("backend/src/App.java", html)
+        self.assertIn("Check syntax near the reported file", html)
+        self.assertIn("unused-import", html)
+
+
+    def test_semgrep_metadata_injection_is_removed(self):
+        evaluated = deepcopy(self.evaluated)
+        semgrep = deepcopy(evaluated["blocking_results"][1])
+        semgrep["tool"] = "semgrep"
+        semgrep["normalized"]["runtime_error"] = True
+        semgrep["normalized"]["metadata"] = {
+            "scanner_errors": [
+                {
+                    "type": self.secret,
+                    "file": f"src/{self.secret}.java",
+                    "line": self.secret,
+                    "message": f"<script>{self.secret}</script>",
+                }
+            ]
+        }
+
+        evaluated["blocking_results"].append(semgrep)
+
+        diagnostic = prepare_diagnostic_document(evaluated)
+        html = build_html_report(diagnostic, self.env)
+
+        self.assertNotIn(self.secret, html)
+        self.assertNotIn(f"<script>{self.secret}</script>", html)
+        self.assertIn("[path withheld]", html)
+        self.assertIn("Semgrep Scanner Errors (1)", html)
+
+
+    def test_semgrep_parser_does_not_copy_raw_error_messages(self):
+        from quality.CI.gate.parsers.semgrep import parse_semgrep
+
+        with TemporaryDirectory() as folder:
+            raw = {
+                "results": [],
+                "errors": [
+                    {
+                        "type": "ParseError",
+                        "path": "backend/src/App.java",
+                        "start": {"line": 27},
+                        "message": self.secret,
+                    }
+                ],
+            }
+
+            Path(folder, "semgrep.json").write_text(
+                json.dumps(raw),
+                encoding="utf-8",
+            )
+
+            parsed = parse_semgrep(Path(folder))
+
+            self.assertTrue(parsed["runtime_error"])
+            self.assertEqual(
+                parsed["metadata"]["scanner_errors"][0]["type"],
+                "ParseError",
+            )
+            self.assertNotIn(self.secret, json.dumps(parsed))
+
+
 if __name__ == "__main__":
     unittest.main()

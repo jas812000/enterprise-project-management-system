@@ -53,3 +53,6 @@ __pycache__/
 
 # CI Quality Gate - Generated Analysis Artifacts
 /quality/analysis/
+
+# Local quality gate test fixtures
+/quality/fixtures/

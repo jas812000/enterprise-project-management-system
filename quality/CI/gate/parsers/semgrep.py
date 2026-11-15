@@ -239,6 +239,55 @@ def parse_semgrep(raw_dir: Path) -> dict:
     if data is None:
         return result
 
+    # Semgrep's raw messages can include source excerpts or credentials.
+    # Publish validated identifiers, locations and curated troubleshooting
+    # guidance instead. Keep raw messages only in the private scan artifact.
+    raw_errors = data.get("errors", [])
+    if not isinstance(raw_errors, list):
+        raw_errors = [{"type": "invalid_error_entry"}]
+
+    if raw_errors:
+        result["runtime_error"] = True
+        safe_errors = []
+
+        for error in raw_errors[:200]:
+            if not isinstance(error, dict):
+                error = {"type": "invalid_error_entry"}
+
+            error_type = error.get("type", "unknown")
+            if not (
+                isinstance(error_type, str)
+                and 1 <= len(error_type) <= 64
+                and error_type.isascii()
+                and all(c.isalnum() or c in "_-" for c in error_type)
+            ):
+                error_type = "unknown"
+
+            # Semgrep's 'path' and 'spans' fields may be absent; no raw
+            # error text or source snippets are copied into metadata.
+            path = error.get("path", "")
+            if not isinstance(path, str):
+                path = ""
+
+            start = error.get("start", {})
+            if not isinstance(start, dict):
+                start = {}
+
+            line = start.get("line", 0)
+            if type(line) is not int or not 1 <= line <= 10_000_000:
+                line = 0
+
+            safe_errors.append({
+                "type": error_type,
+                "file": path,
+                "line": line,
+            })
+
+        result["metadata"]["scanner_errors"] = safe_errors
+        result["metadata"]["error"] = (
+            f"Semgrep reported {len(raw_errors)} scanner execution error(s)."
+        )
+
     raw_findings = data.get("results", [])
     findings: list[dict] = []
 

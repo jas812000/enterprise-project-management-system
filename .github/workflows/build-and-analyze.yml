@@ -332,7 +332,7 @@ jobs:
       # ------------------------------------------------------
       - name: Setup Java 25 (Temurin)
         if: success() || failure()
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
@@ -551,15 +551,6 @@ jobs:
 
             errors = data["errors"]
 
-            allowed_error_types = {
-            "SemgrepError",
-            "InvalidRuleSchemaError",
-            "InvalidRuleError",
-            "SemgrepCoreError",
-            "Timeout",
-            "OutOfMemory",
-          }
-
             error_types = Counter()
 
             for error in errors:
@@ -568,7 +559,15 @@ jobs:
               else:
                 reported_type = error.get("type")
 
-                if isinstance(reported_type, str) and reported_type in allowed_error_types:
+                if (
+                isinstance(reported_type, str)
+                and 1 <= len(reported_type) <= 64
+                and reported_type.isascii()
+                and all(
+                character.isalnum() or character in "_-"
+                for character in reported_type
+                )
+                ):
                   category = reported_type
                 else:
                   category = "other"

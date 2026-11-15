@@ -103,6 +103,72 @@ def _safe_analysis_rule(value: object) -> str:
 
     return value
 
+# Curated guidance contains no scanner-controlled text.
+_SEMGREP_GUIDANCE = {
+    "Rule parse error": (
+        "Check the referenced Semgrep rule syntax and configuration."
+    ),
+    "SemgrepError": (
+        "Check Semgrep configuration and the scanner execution logs."
+    ),
+    "InvalidRuleSchemaError": (
+        "Validate the Semgrep rule schema and required fields."
+    ),
+    "UnknownLanguageError": (
+        "Check the language specified by the Semgrep rule."
+    ),
+    "LexicalError": "Check syntax near the reported file and line.",
+    "ParseError": "Check syntax near the reported file and line.",
+    "Timeout": "Check rule complexity and Semgrep timeout settings.",
+    "OutOfMemory": "Check scanner memory limits and scan scope.",
+    "invalid_error_entry": (
+        "Semgrep returned a malformed scanner error entry."
+    ),
+}
+
+
+def _safe_semgrep_error_type(value: object) -> str:
+    if (
+        isinstance(value, str)
+        and 1 <= len(value) <= 64
+        and value.isascii()
+        and re.fullmatch(r"[A-Za-z0-9_-]+", value)
+        and not _SENSITIVE_PATH_PART.search(value)
+        and not re.search(r"[A-Za-z0-9]{24,}", value)
+    ):
+        return value
+
+    return "unknown"
+
+
+def _safe_semgrep_errors(value: object) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+
+    safe = []
+
+    for entry in value[:200]:
+        if not isinstance(entry, dict):
+            entry = {}
+
+        error_type = _safe_semgrep_error_type(entry.get("type"))
+
+        safe.append({
+            "type": error_type,
+            "file": _safe_secret_finding_path(
+                entry.get("file", "")
+            ),
+            "line": _safe_finding_line(
+                entry.get("line", 0)
+            ),
+            "message": _SEMGREP_GUIDANCE.get(
+                error_type,
+                "Check the Semgrep execution logs for this error category.",
+            ),
+        })
+
+    return safe
+
 
 SAFE_SEVERITIES = frozenset({
     "critical",
@@ -192,16 +258,27 @@ def prepare_diagnostic_document(evaluated_doc: dict) -> dict:
                 if original_reason not in ("", "disabled"):
                     result["reason"] = "scanner_runtime_error"
 
-                # Replace raw runtime-error metadata with a safe message.
+                # Preserve validated Semgrep error categories while
+                # removing arbitrary scanner-provided metadata.
+                original_metadata = normalized.get("metadata", {})
+                safe_metadata = {}
+
                 if normalized.get("runtime_error", False):
-                    normalized["metadata"] = {
-                        "error": (
-                            "Scanner encountered a runtime error. "
-                            "Review the GitHub Actions execution logs."
+                    safe_metadata["error"] = (
+                        "Scanner encountered a runtime error. "
+                        "Review the GitHub Actions execution logs."
+                    )
+
+                    if tool == "semgrep" and isinstance(original_metadata, dict):
+                        scanner_errors = original_metadata.get(
+                            "scanner_errors", []
                         )
-                    }
-                else:
-                    normalized["metadata"] = {}
+
+                        safe_metadata["scanner_errors"] = (
+                            _safe_semgrep_errors(scanner_errors)
+                        )
+
+                normalized["metadata"] = safe_metadata
 
                 # Scanner messages may contain source snippets or secrets.
                 for finding in normalized.get("findings", []):

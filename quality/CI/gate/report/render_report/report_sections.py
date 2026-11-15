@@ -104,6 +104,65 @@ def tool_section(
         normalized,
         commit_url,
     )
+    # Display structured Semgrep scanner errors separately
+    # from code findings.
+    scanner_errors_html = ""
+
+    if tool_raw == "semgrep":
+        metadata = normalized.get("metadata", {})
+
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        scanner_errors = metadata.get("scanner_errors", [])
+
+        if isinstance(scanner_errors, list) and scanner_errors:
+            rows = []
+
+            for error in scanner_errors:
+                if not isinstance(error, dict):
+                    continue
+
+                error_type = escape(
+                    str(error.get("type", "unknown")),
+                    quote=True,
+                )
+                error_message = escape(
+                    str(error.get("message", "")),
+                    quote=True,
+                )
+                error_file = escape(
+                    str(error.get("file", "")),
+                    quote=True,
+                )
+                error_line = escape(
+                    str(error.get("line", 0)),
+                    quote=True,
+                )
+
+                rows.append(
+                    f"<tr><td><code>{error_type}</code></td>"
+                    f"<td>{error_file}</td>"
+                    f"<td>{error_line}</td>"
+                    f"<td>{error_message}</td></tr>"
+                )
+
+            if rows:
+                scanner_errors_html = f"""
+                <h3>Semgrep Scanner Errors ({len(rows)})</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Error Type</th>
+                            <th>File</th>
+                            <th>Line</th>
+                            <th>Recommended Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+                """
+
     back_link = '<a href="#tool-results-summary" style="font-size:0.8em;color:#2980b9;text-decoration:none;">↑ Back to summary</a>'
 
     return f"""
@@ -122,6 +181,7 @@ def tool_section(
             <div class="sev-counts">{sev_pills(severity_counts)}</div>
         </div>
         <div class="tool-findings">
+            {scanner_errors_html}
             {findings_html}
             <div style="text-align:right;padding:8px 0 4px;">
                 {back_link}
