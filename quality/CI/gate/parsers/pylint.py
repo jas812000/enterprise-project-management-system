@@ -52,6 +52,7 @@ Pylint JSON Structure
 import json
 from pathlib import Path
 
+from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -112,7 +113,7 @@ def parse_pylint(raw_dir: Path) -> dict:
 
             findings.append(
                 {
-                    "file": raw.get("path", "unknown"),
+                    "file": safe_finding_path(raw.get("path", "unknown")),
                     "line": raw.get("line", 0),
                     "column": raw.get("column", 0),
                     "severity": norm_sev,

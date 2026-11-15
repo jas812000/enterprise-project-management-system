@@ -564,7 +564,7 @@ jobs:
                 and 1 <= len(reported_type) <= 64
                 and reported_type.isascii()
                 and all(
-                character.isalnum() or character in "_-"
+                character.isalnum() or character in "_- "
                 for character in reported_type
                 )
                 ):

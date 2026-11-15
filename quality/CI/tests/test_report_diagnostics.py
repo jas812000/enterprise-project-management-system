@@ -116,8 +116,8 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertEqual(finding["line"], 42)
         self.assertEqual(
             finding["message"],
-            "Scanner finding detected. "
-            "Review the rule and source location for details.",
+            "Review the reported Python code-quality issue "
+            "and correct the affected implementation.",
         )
 
 
@@ -665,10 +665,9 @@ class DiagnosticReportTests(unittest.TestCase):
 
         self.assertNotIn(self.secret, html)
         self.assertIn(
-            "Scanner finding detected.",
+            "Review the reported Python code-quality issue",
             html,
         )
-
 
 
     def test_analysis_rule_validator_preserves_valid_rules(self):

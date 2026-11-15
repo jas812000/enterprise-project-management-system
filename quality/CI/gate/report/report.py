@@ -99,13 +99,14 @@ def generate_report() -> None:
     REPORT_MD_FILE.write_text(md_body, encoding="utf-8")
     print(f"[report] report.md written to: {REPORT_MD_FILE}")
 
-    # Create a publication-safe copy without individual findings.
+    # Exclude individual findings and scanner metadata from the public summary.
     public_evaluated_doc = deepcopy(evaluated_doc)
 
     for group_name in ("blocking_results", "non_blocking_results"):
         for result in public_evaluated_doc.get(group_name, []):
             normalized = result.get("normalized", {})
             normalized["findings"] = []
+            normalized["metadata"] = {}
 
     html_body = build_html_report(public_evaluated_doc, env)
     REPORT_HTML_FILE.write_text(html_body, encoding="utf-8")

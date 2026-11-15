@@ -135,8 +135,11 @@ def tool_section(
                     str(error.get("file", "")),
                     quote=True,
                 )
+                line_value = error.get("line", 0)
                 error_line = escape(
-                    str(error.get("line", 0)),
+                    str(line_value)
+                    if type(line_value) is int and line_value > 0
+                    else "Not provided",
                     quote=True,
                 )
 

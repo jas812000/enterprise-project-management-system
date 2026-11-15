@@ -58,6 +58,7 @@ Bandit JSON Structure
 import json
 from pathlib import Path
 
+from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -116,7 +117,7 @@ def parse_bandit(raw_dir: Path) -> dict:
 
             findings.append(
                 {
-                    "file": raw.get("filename", "unknown"),
+                    "file": safe_finding_path(raw.get("filename", "unknown")),
                     "line": raw.get("line_number", 0),
                     "column": 0,
                     "severity": norm_sev,

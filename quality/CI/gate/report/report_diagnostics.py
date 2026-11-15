@@ -1,18 +1,32 @@
-
 """
-Prepare publication-safe diagnostic findings for the EPMS Quality Gate.
+EPMS Quality Gate Diagnostic Report Preparation
 
-The diagnostic report is separate from the existing summary report.
+Purpose
+-------
+Prepare publication-safe diagnostic findings from evaluated
+quality gate results for detailed HTML reporting.
 
-Security requirements:
-- Never include raw secret-scanner artifacts.
-- Preserve safe finding locations and remediation details.
-- Explicitly indicate that detected secret values are redacted.
-- Do not modify the original evaluated document.
+Security Requirements
+---------------------
+- Exclude raw secret-scanner artifacts and credential values.
+- Preserve validated file locations, rule identifiers, and line numbers.
+- Replace scanner-controlled messages with approved guidance.
+- Explicitly redact detected secret values.
+- Preserve scanner error categories for troubleshooting.
+
+Behavior
+--------
+- Creates a deep copy of the evaluated results.
+- Validates finding fields and scanner metadata.
+- Separates diagnostic information from the summary report.
+- Retains safe remediation information for developers.
+- Does not modify the original evaluated document.
 """
 
 from copy import deepcopy
 import re
+
+from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.report.report_constants import CATEGORY_MAP
 
 SECRET_SCANNERS = frozenset({"gitleaks", "trufflehog"})
@@ -43,32 +57,25 @@ _SENSITIVE_PATH_PART = re.compile(
 
 def _safe_secret_finding_path(value: object) -> str:
     """
-    Retain ordinary repository paths, but suppress suspicious
-    or malformed paths in secret-scanner findings.
+    Validate file paths before including them in diagnostic reports.
+
+    Parameters
+    ----------
+    value : object
+        Scanner-reported file path.
+
+    Returns
+    -------
+    str
+        Validated repository-relative path or "[path withheld]".
     """
-    if not isinstance(value, str) or not value:
-        return "[path withheld]"
+    path = safe_finding_path(value)
 
-    path = value
-
-    if (
-        len(path) > 512
-        or path.startswith(("/", "~"))
-        or re.search(r"[\x00-\x1f\x7f\\]", path)
-    ):
-        return "[path withheld]"
-
-    parts = path.split("/")
-
-    if any(
-        part in (".", "..")
-        or not _SAFE_PATH_PART.fullmatch(part)
-        or _SENSITIVE_PATH_PART.search(part)
-        for part in parts
-    ):
+    if path == "unknown":
         return "[path withheld]"
 
     return path
+
 
 def _safe_secret_rule(value: object) -> str:
     """
@@ -127,12 +134,26 @@ _SEMGREP_GUIDANCE = {
 }
 
 
+
 def _safe_semgrep_error_type(value: object) -> str:
+    """
+    Validate a Semgrep scanner error category.
+
+    Parameters
+    ----------
+    value : object
+        Scanner-provided error category.
+
+    Returns
+    -------
+    str
+        Validated error category or "unknown".
+    """
     if (
         isinstance(value, str)
         and 1 <= len(value) <= 64
         and value.isascii()
-        and re.fullmatch(r"[A-Za-z0-9_-]+", value)
+        and re.fullmatch(r"[A-Za-z0-9_ -]+", value)
         and not _SENSITIVE_PATH_PART.search(value)
         and not re.search(r"[A-Za-z0-9]{24,}", value)
     ):
@@ -142,6 +163,20 @@ def _safe_semgrep_error_type(value: object) -> str:
 
 
 def _safe_semgrep_errors(value: object) -> list[dict]:
+    """
+    Prepare Semgrep scanner errors for diagnostic reporting.
+
+    Parameters
+    ----------
+    value : object
+        Scanner error records.
+
+    Returns
+    -------
+    list[dict]
+        Validated error categories, file locations, line numbers,
+        and approved troubleshooting guidance.
+    """
     if not isinstance(value, list):
         return []
 
@@ -168,6 +203,75 @@ def _safe_semgrep_errors(value: object) -> list[dict]:
         })
 
     return safe
+
+SAFE_POLICY_REASONS = frozenset({
+    "disabled",
+    "scanner_runtime_error",
+    "artifact_missing",
+    "threshold_exceeded",
+    "severity_threshold_exceeded",
+    "violation_threshold_exceeded",
+})
+
+
+def _safe_policy_reason(value: object) -> str:
+    """
+    Preserve recognized policy reasons without exposing scanner text.
+
+    Parameters
+    ----------
+    value : object
+        Quality gate evaluation reason.
+
+    Returns
+    -------
+    str
+        Recognized policy reason or "scanner_runtime_error".
+    """
+    if value in ("", None):
+        return ""
+
+    if isinstance(value, str) and value in SAFE_POLICY_REASONS:
+        return value
+
+    return "scanner_runtime_error"
+
+
+def _analysis_guidance(tool: str, rule: object) -> str:
+    """
+    Provide remediation guidance based on the scanner and rule.
+
+    Parameters
+    ----------
+    tool : str
+        Name of the analysis scanner.
+    rule : object
+        Scanner-reported rule identifier.
+
+    Returns
+    -------
+    str
+        Approved remediation guidance.
+    """
+    if tool == "semgrep":
+        return (
+            "Review the flagged security pattern and update "
+            "the affected code or configuration."
+        )
+
+    if tool == "bandit":
+        return (
+            "Review the reported Python security issue and "
+            "apply the recommended secure coding practice."
+        )
+
+    if tool == "pylint":
+        return (
+            "Review the reported Python code-quality issue "
+            "and correct the affected implementation."
+        )
+
+    return "Review the reported rule and affected source location."
 
 
 SAFE_SEVERITIES = frozenset({
@@ -253,10 +357,8 @@ def prepare_diagnostic_document(evaluated_doc: dict) -> dict:
                     normalized.get("severity_counts", {})
                 )
 
-                # Do not publish arbitrary scanner failure reasons.
-                original_reason = result.get("reason", "")
-                if original_reason not in ("", "disabled"):
-                    result["reason"] = "scanner_runtime_error"
+                # Preserve recognized policy reasons and exclude unvalidated details.
+                result["reason"] = _safe_policy_reason(result.get("reason", ""))
 
                 # Preserve validated Semgrep error categories while
                 # removing arbitrary scanner-provided metadata.
@@ -295,9 +397,9 @@ def prepare_diagnostic_document(evaluated_doc: dict) -> dict:
                         "rule": _safe_analysis_rule(
                              finding.get("rule", "")
                         ),
-                        "message": (
-                            "Scanner finding detected. "
-                            "Review the rule and source location for details."
+                        "message": _analysis_guidance(
+                            tool,
+                            finding.get("rule", ""),
                         ),
                         "rule_url": "",
                     }
@@ -307,12 +409,8 @@ def prepare_diagnostic_document(evaluated_doc: dict) -> dict:
 
                 continue
 
-            # Scanner-provided reasons may contain credentials.
-            # Preserve the failure category without its raw details.
-            original_reason = result.get("reason", "")
-
-            if original_reason not in ("", "disabled"):
-                result["reason"] = "scanner_runtime_error"
+            # Preserve recognized policy reasons and exclude unvalidated details.
+            result["reason"] = _safe_policy_reason(result.get("reason", ""))
 
             normalized = result.get("normalized", {})
 

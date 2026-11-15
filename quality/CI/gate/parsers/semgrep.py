@@ -69,7 +69,7 @@ Semgrep JSON Structure
 
 import json
 from pathlib import Path
-
+from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -183,7 +183,7 @@ def _build_semgrep_finding(raw_finding: dict) -> tuple[dict, str]:
     normalized_severity = SEVERITY_MAP.get(native_severity, "info")
 
     finding = {
-        "file": raw_finding.get("path", "unknown"),
+        "file": safe_finding_path(raw_finding.get("path", "unknown")),
         "line": start_data.get("line", 0),
         "column": start_data.get("col", 0),
         "severity": normalized_severity,
@@ -259,7 +259,7 @@ def parse_semgrep(raw_dir: Path) -> dict:
                 isinstance(error_type, str)
                 and 1 <= len(error_type) <= 64
                 and error_type.isascii()
-                and all(c.isalnum() or c in "_-" for c in error_type)
+                and all(c.isalnum() or c in "_- " for c in error_type)
             ):
                 error_type = "unknown"
 
@@ -279,7 +279,7 @@ def parse_semgrep(raw_dir: Path) -> dict:
 
             safe_errors.append({
                 "type": error_type,
-                "file": path,
+                "file": safe_finding_path(path),
                 "line": line,
             })
 
