@@ -60,7 +60,9 @@ PMD XML Structure
 </pmd>
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from xml.etree.ElementTree import Element as XmlElement
+from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
 from quality.CI.gate.schemas import base_tool_result
@@ -80,7 +82,7 @@ SEVERITY_MAP = {
 # Helper functions
 # ----------------------------------------------------------
 
-def _load_pmd_root(artifact: Path, result: dict) -> ET.Element | None:
+def _load_pmd_root(artifact: Path, result: dict) -> XmlElement | None:
     """
     Load and parse the PMD XML artifact.
 
@@ -93,7 +95,7 @@ def _load_pmd_root(artifact: Path, result: dict) -> ET.Element | None:
 
     Returns
     -------
-    ET.Element | None
+    XmlElement | None
         Parsed XML root element, or None on failure.
     """
     try:
@@ -101,19 +103,19 @@ def _load_pmd_root(artifact: Path, result: dict) -> ET.Element | None:
         root = tree.getroot()
         _strip_pmd_namespaces(root)
         return root
-    except (ET.ParseError, OSError, TypeError, ValueError, KeyError) as error:
+    except (ET.ParseError, DefusedXmlException, OSError, TypeError, ValueError, KeyError) as error:
         result["runtime_error"] = True
         result["metadata"]["error"] = f"PMD parse error: {error}"
         return None
 
 
-def _strip_pmd_namespaces(root: ET.Element) -> None:
+def _strip_pmd_namespaces(root: XmlElement) -> None:
     """
     Remove XML namespaces in-place from the PMD tree.
 
     Parameters
     ----------
-    root : ET.Element
+    root : XmlElement
         Root XML element.
     """
     for element in root.iter():
@@ -141,7 +143,7 @@ def _to_int(value: str | int) -> int:
         return 0
 
 
-def _build_pmd_finding(file_path: str, violation: ET.Element) -> tuple[dict, str]:
+def _build_pmd_finding(file_path: str, violation: XmlElement) -> tuple[dict, str]:
     """
     Convert one PMD <violation> node into a normalized finding.
 
@@ -149,7 +151,7 @@ def _build_pmd_finding(file_path: str, violation: ET.Element) -> tuple[dict, str
     ----------
     file_path : str
         Source file path from the parent <file> node.
-    violation : ET.Element
+    violation : XmlElement
         PMD <violation> element.
 
     Returns

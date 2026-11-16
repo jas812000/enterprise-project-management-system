@@ -55,7 +55,9 @@ SpotBugs XML Structure
 </BugCollection>
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from xml.etree.ElementTree import Element as XmlElement
+from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
 from quality.CI.gate.schemas import base_tool_result
@@ -73,7 +75,7 @@ SEVERITY_MAP = {
 # Helper functions
 # ----------------------------------------------------------
 
-def _load_spotbugs_root(artifact: Path, result: dict) -> ET.Element | None:
+def _load_spotbugs_root(artifact: Path, result: dict) -> XmlElement | None:
     """
     Load and parse the SpotBugs XML artifact.
 
@@ -86,25 +88,25 @@ def _load_spotbugs_root(artifact: Path, result: dict) -> ET.Element | None:
 
     Returns
     -------
-    ET.Element | None
+    XmlElement | None
         Parsed XML root element, or None on failure.
     """
     try:
         tree = ET.parse(artifact)
         return tree.getroot()
-    except (ET.ParseError, OSError, TypeError, ValueError, KeyError) as error:
+    except (ET.ParseError, DefusedXmlException, OSError, TypeError, ValueError, KeyError) as error:
         result["runtime_error"] = True
         result["metadata"]["error"] = f"SpotBugs parse error: {error}"
         return None
 
 
-def _extract_source_info(bug: ET.Element) -> tuple[str, int]:
+def _extract_source_info(bug: XmlElement) -> tuple[str, int]:
     """
     Extract source file and starting line from a BugInstance.
 
     Parameters
     ----------
-    bug : ET.Element
+    bug : XmlElement
         SpotBugs BugInstance element.
 
     Returns
@@ -121,13 +123,13 @@ def _extract_source_info(bug: ET.Element) -> tuple[str, int]:
     return source_file, line_start
 
 
-def _extract_message(bug: ET.Element) -> str:
+def _extract_message(bug: XmlElement) -> str:
     """
     Extract the short human-readable message from a BugInstance.
 
     Parameters
     ----------
-    bug : ET.Element
+    bug : XmlElement
         SpotBugs BugInstance element.
 
     Returns
@@ -141,13 +143,13 @@ def _extract_message(bug: ET.Element) -> str:
     return ""
 
 
-def _extract_class_name(bug: ET.Element) -> str:
+def _extract_class_name(bug: XmlElement) -> str:
     """
     Extract the Java class name from a BugInstance.
 
     Parameters
     ----------
-    bug : ET.Element
+    bug : XmlElement
         SpotBugs BugInstance element.
 
     Returns
@@ -161,13 +163,13 @@ def _extract_class_name(bug: ET.Element) -> str:
     return "unknown"
 
 
-def _build_spotbugs_finding(bug: ET.Element) -> tuple[dict, str]:
+def _build_spotbugs_finding(bug: XmlElement) -> tuple[dict, str]:
     """
     Convert one SpotBugs BugInstance into a normalized finding.
 
     Parameters
     ----------
-    bug : ET.Element
+    bug : XmlElement
         SpotBugs BugInstance element.
 
     Returns
