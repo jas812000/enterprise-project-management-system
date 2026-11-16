@@ -237,41 +237,58 @@ def _safe_policy_reason(value: object) -> str:
     return "scanner_runtime_error"
 
 
+# Diagnostic messages must be curated, not arbitrary scanner-controlled text.
+# A scanner message can contain source snippets or credentials, so do not
+# interpolate it into published HTML. The raw ZIP retains full evidence.
+_PYLINT_GUIDANCE = {
+    "import-error": "Python module import failed. Check package structure, PYTHONPATH, and installed dependencies; inspect raw/pylint.json for the exact module.",
+    "missing-function-docstring": "Add a docstring explaining the function's purpose, parameters, and return value.",
+    "missing-class-docstring": "Add a class docstring explaining its purpose and responsibilities.",
+    "duplicate-code": "Pylint found repeated code in multiple modules. Inspect raw/pylint.json for the matching files and line ranges; extract a shared helper if appropriate.",
+    "wrong-import-order": "Reorder imports into standard-library, third-party, and first-party groups as required by Pylint.",
+    "ungrouped-imports": "Group imports from the same package together.",
+    "import-outside-toplevel": "Move this import to module scope unless deferred importing is intentional (for example, to avoid a cycle).",
+    "unidiomatic-typecheck": "Prefer isinstance(value, ExpectedType) to type(value) comparisons, unless exact-type semantics are required.",
+    "unused-import": "An imported module or name is not used. Remove the unused import or use it where intended.",
+    "unused-argument": "A function parameter is unused. Remove it when compatible with the API, or document why it is required.",
+    "unused-variable": "A local variable is assigned but never used. Remove it or use the intended result.",
+    "too-many-locals": "This function has too many local variables. Extract cohesive helper functions or simplify intermediate state.",
+    "too-many-return-statements": "Consider simplifying the function's control flow or extracting helper functions to reduce return branches.",
+    "too-many-branches": "Reduce branching complexity by extracting smaller functions or simplifying conditions.",
+    "too-many-boolean-expressions": "Simplify the conditional expression, for example by extracting a named predicate.",
+    "too-many-public-methods": "This class exposes many public methods. Consider separating unrelated responsibilities.",
+    "broad-exception-caught": "Catch specific exception types rather than a broad Exception where possible.",
+    "consider-using-with": "Use a context manager (with statement) to ensure resources are released correctly.",
+    "invalid-name": "Rename the identifier to follow the project's Pylint naming conventions, if compatibility permits.",
+    "redefined-outer-name": "A local name shadows a name in an outer scope. Rename or remove the conflicting binding.",
+    "reimported": "The module or symbol is imported more than once. Remove the redundant import.",
+    "bad-indentation": "Correct indentation to match the surrounding Python block.",
+    "line-too-long": "Wrap this line to meet the configured maximum line length.",
+    "missing-final-newline": "Add a newline at the end of the file.",
+}
+_BANDIT_GUIDANCE = {
+    "B405": "Potentially unsafe xml.etree.ElementTree import. Verify untrusted XML is parsed using defusedxml; remove unnecessary standard-library XML imports when possible.",
+    "B105": "Possible hardcoded credential. Replace real secrets with environment or secret-manager values; for synthetic tests, construct safe fixtures without embedding credential-like literals.",
+}
+
+
 def _analysis_guidance(tool: str, rule: object) -> str:
-    """
-    Provide remediation guidance based on the scanner and rule.
-
-    Parameters
-    ----------
-    tool : str
-        Name of the analysis scanner.
-    rule : object
-        Scanner-reported rule identifier.
-
-    Returns
-    -------
-    str
-        Approved remediation guidance.
-    """
-    if tool == "semgrep":
-        return (
-            "Review the flagged security pattern and update "
-            "the affected code or configuration."
-        )
-
-    if tool == "bandit":
-        return (
-            "Review the reported Python security issue and "
-            "apply the recommended secure coding practice."
-        )
-
+    """Return safe, rule-specific remediation guidance."""
+    if not isinstance(rule, str):
+        rule = ""
     if tool == "pylint":
-        return (
-            "Review the reported Python code-quality issue "
-            "and correct the affected implementation."
+        return _PYLINT_GUIDANCE.get(
+            rule,
+            "An imported module or name is not used. Remove the unused import or use it where intended.",
         )
-
-    return "Review the reported rule and affected source location."
+    if tool == "bandit":
+        return _BANDIT_GUIDANCE.get(
+            rule,
+            "Inspect the Bandit rule and raw/bandit.json; apply the recommended secure coding practice after checking the actual code path.",
+        )
+    if tool == "semgrep":
+        return "Review the flagged security pattern, affected code, and Semgrep rule guidance."
+    return "Inspect the scanner rule and corresponding raw artifact for the specific issue."
 
 
 SAFE_SEVERITIES = frozenset({

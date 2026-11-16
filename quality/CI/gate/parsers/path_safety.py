@@ -46,6 +46,14 @@ def safe_finding_path(value: object) -> str:
 
     path = value
 
+    # Normalize harmless scanner-generated /./ segments, including
+    # GitHub Actions paths ending in /./quality/... . Never normalize
+    # traversal (/../), which remains rejected below.
+    if "/../" in path or path.endswith("/.."):
+        return "unknown"
+    # Keep relative dot segments invalid; only absolute workspace paths
+    # are canonicalized by os.path.normpath below.
+
     # Convert absolute workspace paths to repository-relative paths.
     if path.startswith("/"):
         workspace = os.environ.get("GITHUB_WORKSPACE", "")
@@ -81,9 +89,11 @@ def safe_finding_path(value: object) -> str:
     ):
         return "unknown"
 
-    # Reject unusually long credential-like path components.
+    # Long snake_case filenames are normal (e.g. test_report_diagnostics.py).
+    # Reject credential-like opaque components, not ordinary long names.
     if any(
-        re.search(r"[A-Za-z0-9_]{24,}", part)
+        re.search(r"[A-Za-z0-9]{40,}", part)
+        or re.search(r"(?:SYNTHETIC_SECRET|TEST_CREDENTIAL)", part, re.I)
         for part in normalized.split("/")
     ):
         return "unknown"

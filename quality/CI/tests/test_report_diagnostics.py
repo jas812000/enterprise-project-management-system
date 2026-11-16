@@ -116,8 +116,7 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertEqual(finding["line"], 42)
         self.assertEqual(
             finding["message"],
-            "Review the reported Python code-quality issue "
-            "and correct the affected implementation.",
+            "An imported module or name is not used. Remove the unused import or use it where intended.",
         )
 
 
@@ -665,7 +664,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
         self.assertNotIn(self.secret, html)
         self.assertIn(
-            "Review the reported Python code-quality issue",
+            "An imported module or name is not used",
             html,
         )
 
