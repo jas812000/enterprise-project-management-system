@@ -7,10 +7,16 @@ scanner metadata and that file paths are validated.
 """
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from quality.CI.gate.parsers.gitleaks import _build_gitleaks_finding
-from quality.CI.gate.parsers.trufflehog import _build_finding
+from quality.CI.gate.parsers.trufflehog import (
+    _build_finding,
+    _is_known_safe_jdbc_url,
+    parse_trufflehog,
+)
 from quality.CI.gate.parsers.path_safety import safe_finding_path
 
 
@@ -134,6 +140,123 @@ class SecretScannerSecurityTests(unittest.TestCase):
         finding, _ = _build_finding(record)
 
         self.assertEqual(finding["file"], "unknown")
+
+
+    def test_known_safe_jdbc_url_is_excluded(self):
+        record = {
+            "DetectorName": "JDBC",
+            "Verified": False,
+            "Raw": "jdbc:postgresql://localhost:5432/epms",
+        }
+
+        path = "backend/src/main/resources/application.properties"
+
+        self.assertTrue(_is_known_safe_jdbc_url(record, path))
+
+
+    def test_other_jdbc_urls_are_not_excluded(self):
+        path = "backend/src/main/resources/application.properties"
+
+        records = (
+            {
+                "DetectorName": "JDBC",
+                "Verified": False,
+                "Raw": "jdbc:postgresql://db.example.com:5432/epms",
+            },
+            {
+                "DetectorName": "JDBC",
+                "Verified": True,
+                "Raw": "jdbc:postgresql://localhost:5432/epms",
+            },
+            {
+                "DetectorName": "JDBC",
+                "Verified": False,
+                "Raw": "jdbc:postgresql://localhost:5432/epms?password=secret",
+            },
+        )
+
+        for record in records:
+            with self.subTest(record=record):
+                self.assertFalse(_is_known_safe_jdbc_url(record, path))
+
+
+    def test_trufflehog_parser_filters_only_known_safe_jdbc_url(self):
+        """
+        Verify the complete parser excludes only the approved
+        JDBC false positive and preserves other findings.
+        """
+        config_path = "/repo/backend/src/main/resources/application.properties"
+
+        def make_record(raw_value, line_number):
+            return {
+                "DetectorName": "JDBC",
+                "Verified": False,
+                "Raw": raw_value,
+                "SourceMetadata": {
+                    "Data": {
+                        "Filesystem": {
+                            "file": config_path,
+                            "line": line_number,
+                        }
+                    }
+                },
+            }
+
+        records = [
+            make_record(
+                "jdbc:postgresql://localhost:5432/epms",
+                3,
+            ),
+            make_record(
+                "jdbc:postgresql://db.example.com:5432/epms",
+                4,
+            ),
+            make_record(
+                "jdbc:postgresql://localhost:5432/epms?password=example",
+                5,
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            raw_dir = Path(temporary_directory)
+            artifact = raw_dir / "trufflehog.jsonl"
+
+            artifact.write_text(
+                "\n".join(json.dumps(record) for record in records) + "\n",
+                encoding="utf-8",
+            )
+
+            result = parse_trufflehog(raw_dir)
+
+        self.assertTrue(result["executed"])
+        self.assertTrue(result["artifact_present"])
+        self.assertFalse(result["runtime_error"])
+
+        # The approved localhost URL is excluded.
+        self.assertEqual(result["violation_count"], 2)
+
+        # Both remaining unverified findings are high severity.
+        self.assertEqual(result["severity_counts"]["high"], 2)
+        self.assertEqual(result["max_severity"], "high")
+
+        # Ensure only the unsafe or unapproved URLs remain.
+        finding_lines = {
+            finding["line"] for finding in result["findings"]
+        }
+
+        self.assertEqual(finding_lines, {4, 5})
+
+        # Raw connection strings must not appear in normalized output.
+        normalized_output = json.dumps(result)
+
+        self.assertNotIn(
+            "jdbc:postgresql://db.example.com:5432/epms",
+            normalized_output,
+        )
+        self.assertNotIn(
+            "password=example",
+            normalized_output,
+        )
 
 
 if __name__ == "__main__":

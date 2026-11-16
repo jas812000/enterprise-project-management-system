@@ -142,6 +142,21 @@ def _extract_filesystem_data(record: dict) -> dict:
     return filesystem_data if isinstance(filesystem_data, dict) else {}
 
 
+def _is_known_safe_jdbc_url(record: dict, file_path: str | None) -> bool:
+    """
+    Ignore only EPMS's known, credential-free local JDBC URL.
+
+    All other JDBC findings remain reportable.
+    Verified findings are never suppressed.
+    """
+    return (
+        record.get("DetectorName") == "JDBC"
+        and record.get("Verified") is False
+        and file_path == "backend/src/main/resources/application.properties"
+        and record.get("Raw") == "jdbc:postgresql://localhost:5432/epms"
+    )
+
+
 def _is_self_referential(file_path: str | None) -> bool:
     """
     Detect whether TruffleHog scanned its own output artifact.
@@ -278,10 +293,15 @@ def parse_trufflehog(raw_dir: Path) -> dict:
 
         filesystem_data = _extract_filesystem_data(record)
         file_path = _repo_relpath(filesystem_data.get("file"))
+
         if _is_self_referential(file_path):
             continue
 
+        if _is_known_safe_jdbc_url(record, file_path):
+            continue
+
         finding, normalized_severity = _build_finding(record)
+
         result["severity_counts"][normalized_severity] += 1
         findings.append(finding)
 

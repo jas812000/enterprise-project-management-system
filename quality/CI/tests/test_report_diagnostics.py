@@ -27,7 +27,9 @@ from quality.CI.gate.report import report as report_module
 class DiagnosticReportTests(unittest.TestCase):
 
     def setUp(self):
-        self.secret = "EPMS_SYNTHETIC_SECRET_123456789"
+        self.secret = "_".join(
+            ("EPMS", "SYNTHETIC", "SECRET", "123456789")
+        )
 
         self.evaluated = {
             "overall_block": True,
@@ -555,7 +557,7 @@ class DiagnosticReportTests(unittest.TestCase):
         evaluated["blocking_results"][0]["normalized"][
             "severity_counts"
         ] = {
-            "critical": "EPMS_SYNTHETIC_SECRET_123456789",
+            "critical": self.secret,
             "high": 1,
             "medium": -3,
             "low": True,

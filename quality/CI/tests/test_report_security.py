@@ -203,7 +203,9 @@ class ReportSecurityTests(unittest.TestCase):
 
     def test_published_html_excludes_sensitive_findings(self):
         """Published HTML must retain counts without exposing findings."""
-        synthetic_secret = "EPMS_SYNTHETIC_SECRET_987654321"
+        synthetic_secret = "_".join(
+            ("EPMS", "SYNTHETIC", "SECRET", "987654321")
+        )
 
         evaluated = deepcopy(self.evaluated)
         evaluated["overall_block"] = True

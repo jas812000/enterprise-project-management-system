@@ -303,10 +303,21 @@ jobs:
 
           SCANNER_EXIT=0
 
+          # Exclude Git metadata and generated scanner output.
+          # Continue scanning application configuration and source files.
+          EXCLUDE_FILE="${RUNNER_TEMP}/trufflehog-exclude.txt"
+
+          cat > "${EXCLUDE_FILE}" <<'EOF'
+          (^|/)\.git(/|$)
+          (^|/)quality/analysis(/|$)
+          EOF
+
           docker run --rm \
-            -v "${GITHUB_WORKSPACE}:/repo" \
+            -v "${GITHUB_WORKSPACE}:/repo:ro" \
+            -v "${EXCLUDE_FILE}:/tmp/trufflehog-exclude.txt:ro" \
             trufflesecurity/trufflehog:3.82.6 \
             filesystem "/repo/${SCAN_ROOT}" \
+            --exclude-paths /tmp/trufflehog-exclude.txt \
             --json \
             --no-verification \
             >> "${OUT}" || SCANNER_EXIT=$?
