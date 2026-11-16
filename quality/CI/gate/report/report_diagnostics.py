@@ -206,6 +206,8 @@ def _safe_semgrep_errors(value: object) -> list[dict]:
 
 SAFE_POLICY_REASONS = frozenset({
     "disabled",
+    "finding_present",
+    "severity_high_and_above",
     "scanner_runtime_error",
     "artifact_missing",
     "threshold_exceeded",

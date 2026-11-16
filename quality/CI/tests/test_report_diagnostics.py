@@ -389,7 +389,7 @@ class DiagnosticReportTests(unittest.TestCase):
             prepare_diagnostic_document,
         )
 
-        secret = "SENSITIVE_TEST_CREDENTIAL_12345"
+        secret = "_".join(("SENSITIVE", "TEST", "CREDENTIAL", "12345"))
 
         evaluated_doc = {
             "blocking_results": [

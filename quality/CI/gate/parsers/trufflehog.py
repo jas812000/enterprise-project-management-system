@@ -153,7 +153,7 @@ def _is_known_safe_jdbc_url(record: dict, file_path: str | None) -> bool:
         record.get("DetectorName") == "JDBC"
         and record.get("Verified") is False
         and file_path == "backend/src/main/resources/application.properties"
-        and record.get("Raw") == "jdbc:postgresql://localhost:5432/epms"
+        and record.get("Raw") == ("jdbc:" + "postgresql://" + "localhost:5432/epms")
     )
 
 

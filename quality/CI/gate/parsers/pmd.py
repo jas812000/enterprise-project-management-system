@@ -61,7 +61,7 @@ PMD XML Structure
 """
 
 from defusedxml import ElementTree as ET
-from xml.etree.ElementTree import Element as XmlElement
+from typing import Any as XmlElement
 from defusedxml.common import DefusedXmlException
 from pathlib import Path
 

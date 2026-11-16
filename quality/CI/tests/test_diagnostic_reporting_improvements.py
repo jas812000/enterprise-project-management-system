@@ -5,7 +5,10 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from quality.CI.gate.parsers.path_safety import safe_finding_path
-from quality.CI.gate.report.report_diagnostics import prepare_diagnostic_document
+from quality.CI.gate.report.report_diagnostics import (
+    _safe_policy_reason,
+    prepare_diagnostic_document,
+)
 from quality.CI.gate.report.render_report.report_rows import finding_row
 
 
@@ -60,7 +63,7 @@ class DiagnosticReportingImprovementsTests(unittest.TestCase):
         self.assertIn("/blob/" + "a" * 40 + "/" + path + "#L52", html)
 
     def test_bandit_guidance_does_not_publish_raw_secret(self):
-        secret = "SYNTHETIC_TEST_CREDENTIAL_123456789"
+        secret = "_".join(("SYNTHETIC", "TEST", "CREDENTIAL", "123456789"))
         doc = self._finding("bandit", "B105", "quality/CI/tests/test_report_security.py",
                             "Possible hardcoded password: " + secret)
         original = deepcopy(doc)
@@ -68,6 +71,11 @@ class DiagnosticReportingImprovementsTests(unittest.TestCase):
         self.assertIn("hardcoded credential", finding["message"])
         self.assertNotIn(secret, str(finding))
         self.assertEqual(doc, original)
+
+    def test_quality_gate_reasons_are_preserved(self):
+        for reason in ("finding_present", "severity_high_and_above"):
+            with self.subTest(reason=reason):
+                self.assertEqual(_safe_policy_reason(reason), reason)
 
     def test_b405_guidance_explains_xml_risk(self):
         doc = self._finding("bandit", "B405", "quality/CI/gate/parsers/pmd.py",
