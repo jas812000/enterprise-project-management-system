@@ -1,4 +1,4 @@
-# CI Quality Gate Engine
+# EPMS CI Quality Gate Engine
 
 ## Overview
 
@@ -14,11 +14,17 @@ The quality gate:
 4. Generates Markdown and HTML reports.
 5. Determines the quality-gate exit code according to the configured enforcement mode.
 
-Scanner execution-status integration with GitHub Actions remains in progress.
+Scanner execution-status integration is implemented; the GitHub Actions workflow completed successfully on PR #11 and `main` on 2026-11-17.
 
 GitHub branch protection or repository rulesets must be configured separately to require successful checks before merging.
 
 ---
+
+## Installation and reusable project configuration
+
+Keep the complete `quality/` tree and `.github/workflows/build-and-analyze.yml` in the host repository. Copy `quality/project.example.json` to `quality/project.json`, edit repository-relative source paths and Java version, and never store secrets in the configuration. See `quality/PORTABILITY.md` for the full field reference, prerequisites, and limitations.
+
+The workflow is triggered by pull requests to `main` and pushes to `main`. Configure GitHub branch protection/rulesets separately to require the `quality-gate` check when enforcement is desired.
 
 ## Pipeline Architecture
 
@@ -113,7 +119,7 @@ These thresholds describe the documented scanner policy. The authoritative confi
 
 A blocking policy violation causes the gate to fail when enforcement mode is active. Preventing a pull request from merging additionally requires the appropriate GitHub branch protection or ruleset configuration.
 
-Scanner execution-status integration is not yet complete in the GitHub Actions workflow.
+The workflow now generates execution-status records; inspect the analysis artifact to validate individual scanner results.
 
 ---
 
@@ -277,15 +283,9 @@ The registry must remain consistent with the scanner parser registrations and po
 
 ### Workflow Integration Status
 
-The normalization layer supports scanner execution-status validation.
+The workflow produces scanner status files and invokes normalization and policy evaluation. PR #11 (run #19) and the subsequent `main` run #20 succeeded on 2026-11-17. Run #20 uploaded `20_cc84e5d_quality_analysis_report`. Workflow success does not prove that every scanner had zero findings.
 
-The GitHub Actions workflow must be updated to generate status files for all registered scanners.
-
-That integration remains in progress.
-
-The workflow must preserve scanner failures as failures rather than substituting artificial clean reports or silently ignoring execution errors.
-
----
+Scanner failures must remain failures rather than being replaced by artificial clean reports.
 
 ## Viewing Results
 
@@ -301,7 +301,7 @@ The intended workflow is:
 
 The Markdown report is intended for the GitHub Actions job summary.
 
-Publication of the report to the job summary must be verified against the completed workflow configuration.
+Review the GitHub Actions run summary to verify report publication behavior.
 
 ### Option 2 - Pull Request Checks
 
@@ -309,7 +309,7 @@ The quality gate is intended to appear in pull request checks.
 
 When the workflow and repository protection rules are fully configured, a failed required check will prevent merging.
 
-Pull request comment publication is supported by the reporting design but must be verified against the workflow integration.
+Pull request comment publication depends on token permissions and workflow configuration; verify it for each host.
 
 ### Branch Protection
 
@@ -331,7 +331,7 @@ When the workflow is configured to upload analysis artifacts:
 4. Download and extract the ZIP file.
 5. Review the raw, normalized, evaluated, and reporting outputs.
 
-Artifact upload behavior must be verified during GitHub Actions integration.
+Artifact upload was confirmed for the `main` workflow run #20 on 2026-11-17.
 
 ---
 
@@ -791,30 +791,18 @@ cd backend
 
 ### Last Confirmed Local Test Results
 
-| Test Suite | Tests Passed |
+| Suite | Passed |
 |---|---:|
-| BN1 Local Scans | 19 |
-| BN2 CI Quality Gate | 13 |
-| Java Backend | 77 |
-| **Total** | **109** |
+| CI Python unit tests | 74 |
+| Local Python unit tests | 21 |
+| Shared Python unit tests | 9 |
+| **Total Python tests (2026-11-17)** | **104** |
 
-These results represent the last confirmed local verification during BN2 development.
-
-They do not establish that all 12 external scanners have executed successfully in GitHub Actions.
+The earlier Java backend result of 77 passing tests is a separate historical verification, not part of the 104 Python tests.
 
 ### Test Discovery Note
 
-The following command should not be used as the sole verification method:
-
-```bash
-python3 -m unittest discover -s quality -p 'test_*.py' -v
-```
-
-During previous verification, this command discovered zero tests.
-
-Use the explicit BN1 and BN2 test commands above.
-
----
+Use the explicit discovery commands for each test suite; broad discovery under `quality/` can miss tests.
 
 ## Directory Structure
 
@@ -897,30 +885,18 @@ Changes to shared contracts should be accompanied by corresponding tests.
 
 ## Current Implementation Status
 
-### Completed or Locally Verified
+### Verified as of 2026-11-17
 
-- Twelve scanner parsers registered.
-- Twelve raw artifact mappings registered.
+- Twelve scanner parsers and artifact mappings registered.
 - Scanner execution-status validation implemented.
-- Completed, failed, and disabled status handling implemented.
-- Missing or invalid status files handled as runtime errors.
-- Parser exception isolation implemented.
-- BN1 and BN2 local Python tests passing.
-- Java backend Maven verification passing.
+- GitHub Actions Build and Analyze runs #19 (PR) and #20 (`main`) succeeded.
+- Run #20 uploaded an analysis artifact.
+- 104 Python tests passed (74 CI, 21 local, 9 shared).
+- Local BN1 completed with seven clean scanners, two disabled, zero findings and zero execution errors.
 
-### Remaining BN2 Work
+### Remaining verification
 
-1. Review documentation and Python docstrings for consistency.
-2. Verify documented policy operators against the current policy engine.
-3. Complete scanner execution-status generation in GitHub Actions.
-4. Ensure all 12 scanner steps produce valid execution-status files.
-5. Remove any workflow behavior that masks scanner execution failures.
-6. Verify normalization and policy evaluation in GitHub Actions.
-7. Verify report generation, publication, and artifact uploads.
-8. Confirm the workflow produces the intended gate exit code.
-9. Run final local and CI verification.
-10. Review the completed changes before staging and committing.
-11. Prepare the feature branch pull request with a descriptive title and Markdown description.
-12. Configure required GitHub checks when enforcement is ready.
-
-The CI quality gate should not be considered fully integrated until the GitHub Actions workflow has been tested end to end.
+1. Review all individual scanner statuses, normalized findings, and policy decisions in the CI artifact.
+2. Confirm GitHub branch protection/rulesets require the intended check.
+3. Test fresh-environment and separate-repository portability.
+4. Verify PR-comment behavior if the host project requires it.

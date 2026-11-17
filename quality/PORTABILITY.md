@@ -1,53 +1,87 @@
-# Portable Quality Gate — incremental refactor
+# Quality Gate — Project Configuration and Portability
 
-This is a **first-step portability patch**, not a complete standalone quality toolkit.
-It configures the Java source path and Maven project path without changing EPMS defaults.
+## Scope
 
-## Host project setup
+This is a **partially reusable toolkit**, not a fully tested standalone product. The
+local gate (BN1) is advisory; the GitHub Actions CI gate uses its own policy.
+EPMS is the reference host. A separate-repository portability test and live
+GitHub Actions validation are still required.
 
-1. Copy the complete `quality/` directory from the patched EPMS repository.
-2. Create `quality/project.json` from `quality/project.example.json`, setting
-   `java_source` and `maven_project` to paths relative to the host repo.
-3. Install the original scanner prerequisites and Python requirements.
-4. Run `sh quality/Local_Scans/run-local-checks.sh` from the host repository.
-5. Inspect the generated report, especially scanner execution errors.
-6. Configure the Git hook with
-   `git config --local core.hooksPath quality/Local_Scans/hooks`.
+## Install in a host repository
 
-## Scope and limitations
+1. Copy the complete `quality/` directory into the host repository, retaining
+   its relative subdirectories. Also copy/adapt `.github/workflows/build-and-analyze.yml`
+   if CI integration is wanted.
+2. Copy `quality/project.example.json` to `quality/project.json` and edit paths.
+3. Install Python 3.10+, Git, a compatible JDK, Maven or the Maven wrapper,
+   and any scanner-specific prerequisites. Docker Desktop/Engine must be running
+   for the local TruffleHog container scan.
+4. From the repository root, run `bash quality/Local_Scans/run-local-checks.sh`.
+5. Review the HTML report and timestamped ZIP, including scanner **errors**
+   and disabled tools, not only finding counts.
+6. Optionally enable the advisory Git hook:
 
-- This patch does **not** add technology auto-detection or configurable enable/disable
-  for the three Java scanners. Non-Java projects will still report Java scanner errors.
-- The current Gitleaks, TruffleHog, CI workflows, report paths, package imports, and
-  other scanner settings may still contain host-project assumptions.
-- The scanner wrappers still assume a Maven build for SpotBugs.
-- No external repository portability test has been performed.
-- BN1 remains advisory; a zero exit status does not mean zero scanner errors.
-- Never mark portability complete until the complete folder is copied into a separate
-  test repository and all applicable scanners are verified.
+   ```bash
+   git config --local core.hooksPath quality/Local_Scans/hooks
+   chmod +x quality/Local_Scans/hooks/pre-commit
+   ```
 
-## Exact local JDBC false-positive exceptions
+Do not copy generated `reports/`, scanner `tools/`, credentials, or build outputs.
 
-The optional `safe_jdbc_urls` entries use a `file` path and `jdbc_parts`
-object with `scheme`, `host`, `port`, and `database`. The loader validates
-these components and constructs the exact URL at runtime. This avoids
-placing a complete connection string in scanner configuration or validation
-source, where TruffleHog may flag it as an unverified JDBC secret.
-Only unverified JDBC findings matching the configured file and reconstructed
-URL are suppressed; verified or different findings remain reportable.
-Never put credentials, connection query parameters, or remote hosts in these
-exceptions. This is not a general TruffleHog exclusion.
+## Configuration (`quality/project.json`)
 
-## CI configuration precedence
+Paths are relative to the repository root and must remain inside it.
+The loader validates the supplied configuration and exports shell-safe values.
 
-When `quality/project.json` exists, its validated `scan_root`, `maven_project`,
-`python_source`, and `javascript_source` override legacy `.env` and discovery.
-An empty Python or JavaScript source path remains disabled, not auto-discovered.
-The configured `java_version` controls GitHub Actions Java setup (EPMS: 25).
-Missing configuration preserves legacy discovery and Java 25. Invalid configuration
-stops loading; missing configured source directories stop root resolution.
-Gitleaks uses the resolved host scan root and TruffleHog uses the matching
-workspace-relative path within the `/repo` container mount.
+| Field | Purpose | EPMS value |
+|---|---|---|
+| `project_name` | Name in CI scanner reports | `EPMS` |
+| `java_version` | Java version for CI setup | `25` |
+| `scan_root` | Repository-wide CI scanner scope | `.` |
+| `java_source` | Java source directory | `backend/src/main/java` |
+| `maven_project` | Maven project directory | `backend` |
+| `python_source` | Python analysis directory | `quality` |
+| `javascript_source` | JS/CSS/HTML discovery root; empty means none | `""` |
+| `safe_jdbc_urls` | Narrow, unverified JDBC false-positive exceptions | See below |
 
-CI and reuse in a separate repository remain unverified. Java scanner wrappers
-and reporting retain some existing structural assumptions.
+Use `quality/project.example.json` as the template. A host project must
+adjust paths to its actual layout; copying EPMS defaults is not sufficient.
+
+When `project.json` exists, configured CI paths override legacy discovery.
+An explicitly empty Python/JavaScript path does not trigger discovery.
+Without the file, the CI workflow retains legacy discovery and Java 25.
+Invalid configuration or nonexistent configured source directories should
+stop setup rather than silently scan another directory. The CI workflow
+uses the host scan root for Gitleaks and a workspace-relative `/repo` path
+for containerized TruffleHog.
+
+### JDBC exception format
+
+An entry has `file` and `jdbc_parts` (`scheme`, `host`, `port`, `database`).
+The loader reconstructs the exact JDBC URL at runtime. Only **unverified**
+TruffleHog JDBC findings matching that file and URL are suppressed; verified
+or different findings remain reportable. Never add credentials, query
+parameters, or remote hosts as exceptions.
+
+## Local vs CI
+
+- **BN1**: seven scanners currently complete for EPMS (Checkstyle, PMD,
+  SpotBugs, Pylint, Bandit, Gitleaks, TruffleHog). HTMLHint and Stylelint
+  are disabled with the current source configuration. BN1 is advisory,
+  including its pre-commit hook; zero exit code does not prove zero findings
+  or scanner errors. See `Local_Scans/README.md`.
+- **CI**: 12 registered scanners, policy-driven enforcement, and reports.
+  See `CI/gate/README.md` and `CI/gate/policy.yaml`.
+
+## Known limitations and verification
+
+The Java scanner wrappers require a Maven-based Java project. Non-Java
+repositories may need wrapper changes or explicit scanner disable support.
+Some report paths, package imports, and scanner assumptions remain tied to
+the existing directory structure. Windows and cross-project operation have
+not been fully verified.
+
+For EPMS, the most recent local verification (2026-11-17) was 104/104
+Python tests, seven clean scanners, two disabled scanners, zero findings,
+and zero scanner errors. This does **not** validate a fresh installation,
+a non-EPMS repository, or a live GitHub Actions run.
