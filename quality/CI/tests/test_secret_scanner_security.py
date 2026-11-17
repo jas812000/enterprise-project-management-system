@@ -30,8 +30,10 @@ REMOTE_JDBC = JDBC_PREFIX + "db.example.com:5432/epms"
 
 
 class SecretScannerSecurityTests(unittest.TestCase):
+    """Regression tests for the corresponding EPMS quality component."""
 
     def test_gitleaks_excludes_sensitive_metadata(self):
+        """Verify gitleaks excludes sensitive metadata."""
         record = {
             "Secret": SECRET,
             "Match": f"token={SECRET}",
@@ -51,6 +53,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         self.assertEqual(severity, "high")
 
     def test_gitleaks_recognized_rule(self):
+        """Verify gitleaks recognized rule."""
         record = {
             "RuleID": "generic-api-key",
             "Description": f"Untrusted: {SECRET}",
@@ -64,6 +67,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         self.assertNotIn(SECRET, json.dumps(finding))
 
     def test_trufflehog_excludes_sensitive_metadata(self):
+        """Verify trufflehog excludes sensitive metadata."""
         record = {
             "DetectorName": SECRET,
             "Verified": True,
@@ -81,6 +85,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         self.assertEqual(severity, "critical")
 
     def test_trufflehog_recognized_detector(self):
+        """Verify trufflehog recognized detector."""
         record = {
             "DetectorName": "Github",
             "Verified": False,
@@ -93,6 +98,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         self.assertEqual(severity, "high")
 
     def test_valid_repository_paths(self):
+        """Verify valid repository paths."""
         paths = (
             "backend/src/main/App.java",
             "frontend/src/App.tsx",
@@ -104,6 +110,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
                 self.assertEqual(safe_finding_path(path), path)
 
     def test_invalid_repository_paths(self):
+        """Verify invalid repository paths."""
         paths = (
             "../secrets.txt",
             "/etc/passwd",
@@ -120,6 +127,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
                 self.assertEqual(safe_finding_path(path), "unknown")
 
     def test_gitleaks_rejects_invalid_file_path(self):
+        """Verify gitleaks rejects invalid file path."""
         record = {
             "RuleID": "generic-api-key",
             "File": "../secrets.txt",
@@ -130,6 +138,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         self.assertEqual(finding["file"], "unknown")
 
     def test_trufflehog_rejects_invalid_file_path(self):
+        """Verify trufflehog rejects invalid file path."""
         record = {
             "DetectorName": "Github",
             "Verified": False,
@@ -149,6 +158,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
 
 
     def test_known_safe_jdbc_url_is_excluded(self):
+        """Verify known safe jdbc url is excluded."""
         record = {
             "DetectorName": "JDBC",
             "Verified": False,
@@ -161,6 +171,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
 
 
     def test_other_jdbc_urls_are_not_excluded(self):
+        """Verify other jdbc urls are not excluded."""
         path = "backend/src/main/resources/application.properties"
 
         records = (
@@ -194,6 +205,7 @@ class SecretScannerSecurityTests(unittest.TestCase):
         config_path = "/repo/backend/src/main/resources/application.properties"
 
         def make_record(raw_value, line_number):
+            """Set up the test fixture."""
             return {
                 "DetectorName": "JDBC",
                 "Verified": False,

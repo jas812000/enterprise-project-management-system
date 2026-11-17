@@ -9,6 +9,7 @@ build_html_report(evaluated_doc, env) -> str
 
 from datetime import datetime, timezone
 from html import escape
+from quality.shared.reporting.report_controls import summary_table_head
 
 from quality.CI.gate.report.render_report.report_styles import CSS
 from quality.CI.gate.report.render_report.report_scripts import FILTER_JS
@@ -25,47 +26,8 @@ from quality.CI.gate.report.render_report.report_blocks import (
 )
 
 
-def build_html_report(
-    evaluated_doc: dict,
-    env: dict,
-    *,
-    link_findings: bool = False,
-) -> str:
-    """
-    Build the complete HTML report from evaluated results.
-
-    Parameters
-    ----------
-    evaluated_doc : dict
-        Evaluated quality gate document.
-    env : dict
-        Environment metadata for report rendering.
-
-    Returns
-    -------
-    str
-        Full HTML report string.
-    """
-
-    # ----------------------------------------------------------
-    # Extract evaluated result groups
-    # ----------------------------------------------------------
-    overall_block = bool(evaluated_doc.get("overall_block", True))
-    blocking_results = evaluated_doc.get("blocking_results", [])
-    non_blocking_results = evaluated_doc.get("non_blocking_results", [])
-    all_results = blocking_results + non_blocking_results
-
-    # ----------------------------------------------------------
-    # Build reusable display values
-    # ----------------------------------------------------------
-    generated_at = datetime.now(timezone.utc).strftime(
-        "%Y-%m-%d %H:%M:%S UTC"
-    )
-
-    banner_color, banner_text = build_banner(overall_block)
-
-    sha_short, run_url, commit_url = build_run_metadata(env)
-
+def _header_metadata(env: dict, sha_short: str, run_url: str, commit_url: str):
+    """Escape and link untrusted workflow metadata for HTML display."""
     # ----------------------------------------------------------
     # Escape environment-derived metadata
     # ----------------------------------------------------------
@@ -114,12 +76,52 @@ def build_html_report(
     else:
         commit_cell = f"<code>{safe_sha_short}</code>"
 
-    # ----------------------------------------------------------
-    # Build report sections
-    # ----------------------------------------------------------
-    summary_rows = build_summary_rows(all_results)
+    return (run_cell, commit_cell, safe_event_name, safe_scan_root)
 
-    blocking_sections, non_blocking_sections = build_tool_sections(
+
+def _report_results(evaluated_doc: dict) -> tuple[bool, list, list, list]:
+    """Return blocking, advisory, and combined scanner results."""
+    # ----------------------------------------------------------
+    # Extract evaluated result groups
+    # ----------------------------------------------------------
+    overall_block = bool(evaluated_doc.get("overall_block", True))
+    blocking_results = evaluated_doc.get("blocking_results", [])
+    non_blocking_results = evaluated_doc.get("non_blocking_results", [])
+    all_results = blocking_results + non_blocking_results
+
+    return overall_block, blocking_results, non_blocking_results, all_results
+
+
+def build_html_report(
+    evaluated_doc: dict,
+    env: dict,
+    *,
+    link_findings: bool = False,
+) -> str:
+    """
+    Build the complete HTML report from evaluated results.
+
+    Parameters
+    ----------
+    evaluated_doc : dict
+        Evaluated quality gate document.
+    env : dict
+        Environment metadata for report rendering.
+
+    Returns
+    -------
+    str
+        Full HTML report string.
+    """
+
+    overall_block, blocking_results, non_blocking_results, all_results = (
+        _report_results(evaluated_doc)
+    )
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    banner_color, banner_text = build_banner(overall_block)
+    sha_short, run_url, commit_url = build_run_metadata(env)
+    header = _header_metadata(env, sha_short, run_url, commit_url)
+    sections = build_tool_sections(
         blocking_results,
         non_blocking_results,
         commit_url if link_findings else "",
@@ -150,19 +152,19 @@ def build_html_report(
         </tr>
         <tr>
             <td><strong>Pipeline Run</strong></td>
-            <td>{run_cell}</td>
+            <td>{header[0]}</td>
         </tr>
         <tr>
             <td><strong>Trigger</strong></td>
-            <td><code>{safe_event_name}</code></td>
+            <td><code>{header[2]}</code></td>
         </tr>
         <tr>
             <td><strong>Scan Root</strong></td>
-            <td><code>{safe_scan_root}</code></td>
+            <td><code>{header[3]}</code></td>
         </tr>
         <tr>
             <td><strong>Commit SHA</strong></td>
-            <td>{commit_cell}</td>
+            <td>{header[1]}</td>
         </tr>
     </table>
 </div>
@@ -176,23 +178,16 @@ def build_html_report(
 <h2 id="tool-results-summary">Tool Results Summary</h2>
 <table>
     <thead>
-        <tr>
-            <th>Show</th>
-            <th>Tool</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Role</th>
-            <th>Findings</th>
-        </tr>
+{summary_table_head('<th>Show</th>')}
     </thead>
-    <tbody>{summary_rows}</tbody>
+    <tbody>{build_summary_rows(all_results)}</tbody>
 </table>
 
 <div class="section-header">Enforced Tools</div>
-{blocking_sections}
+{sections[0]}
 
 <div class="section-header advisory">Advisory Tools</div>
-{non_blocking_sections}
+{sections[1]}
 
 <footer>
     Generated by EPMS Quality Gate Engine &mdash; {generated_at}

@@ -6,6 +6,8 @@ including tool category mappings, severity color definitions, and
 common Markdown table fragments used across report generators.
 """
 
+from quality.shared.reporting import report_styles
+
 _SECRETS      = "Secrets Scan"
 _SAST_JAVA    = "SAST — Java"
 _SAST_MULTI   = "SAST — Multi"
@@ -15,6 +17,8 @@ _SCA_MULTI    = "SCA — Multi"
 _SCA_CONTAINER = "SCA — Container"
 _QUALITY_GATE = "Quality Gate"
 
+
+SEVERITY_COLORS = report_styles.SEVERITY_COLORS
 
 CATEGORY_MAP: dict[str, str] = {
     "trufflehog":       _SECRETS,
@@ -32,13 +36,6 @@ CATEGORY_MAP: dict[str, str] = {
 }
 
 
-SEVERITY_COLORS: dict[str, str] = {
-    "critical": "#7c0000",
-    "high":     "#c0392b",
-    "medium":   "#e67e22",
-    "low":      "#f1c40f",
-    "info":     "#3498db",
-}
 
 
 _MD_TABLE_HEADER    = "| Field | Value |"

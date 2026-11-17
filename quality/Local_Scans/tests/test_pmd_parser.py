@@ -22,6 +22,7 @@ class TestPmdParser(unittest.TestCase):
             return parse_pmd(path, REPO_ROOT)
 
     def test_empty_report(self):
+        """Verify empty report."""
         xml = f'<pmd xmlns="{PMD_NAMESPACE}"></pmd>'
         findings, counts = self.parse_xml(xml)
 
@@ -29,6 +30,7 @@ class TestPmdParser(unittest.TestCase):
         self.assertEqual(sum(counts.values()), 0)
 
     def test_single_violation(self):
+        """Verify single violation."""
         xml = f"""
         <pmd xmlns="{PMD_NAMESPACE}">
           <file name="/example/epms/backend/src/main/java/Test.java">
@@ -54,6 +56,7 @@ class TestPmdParser(unittest.TestCase):
         self.assertEqual(counts["medium"], 1)
 
     def test_priority_mapping(self):
+        """Verify priority mapping."""
         violations = "\n".join(
             f'<violation beginline="{priority}" '
             f'rule="TestRule" priority="{priority}">Test</violation>'
@@ -76,6 +79,7 @@ class TestPmdParser(unittest.TestCase):
             self.assertEqual(counts[severity], 1)
 
     def test_missing_priority_defaults_to_medium(self):
+        """Verify missing priority defaults to medium."""
         xml = f"""
         <pmd xmlns="{PMD_NAMESPACE}">
           <file name="/example/epms/Test.java">
@@ -90,10 +94,12 @@ class TestPmdParser(unittest.TestCase):
         self.assertEqual(counts["medium"], 1)
 
     def test_malformed_xml_raises_error(self):
+        """Verify malformed xml raises error."""
         with self.assertRaises(RuntimeError):
             self.parse_xml("<pmd><file></pmd>")
 
     def test_wrong_root_raises_error(self):
+        """Verify wrong root raises error."""
         with self.assertRaises(RuntimeError):
             self.parse_xml("<not_pmd></not_pmd>")
 

@@ -75,7 +75,7 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
-def _repo_relative_path(p: str | None) -> str | None:
+def _repo_relative_path(path_value: str | None) -> str | None:
     """
     Normalize a repository-relative file path.
 
@@ -84,7 +84,7 @@ def _repo_relative_path(p: str | None) -> str | None:
 
     Parameters
     ----------
-    p : str | None
+    path_value : str | None
         Input path value.
 
     Returns
@@ -92,21 +92,21 @@ def _repo_relative_path(p: str | None) -> str | None:
     str | None
         Cleaned repository-relative path, or None if not usable.
     """
-    if not p:
+    if not path_value:
         return None
 
-    s = str(p).strip()
+    cleaned_path = str(path_value).strip()
 
-    if s.startswith("/repo/"):
-        s = s[len("/repo/"):]
+    if cleaned_path.startswith("/repo/"):
+        cleaned_path = cleaned_path[len("/repo/"):]
 
-    if s.startswith("./"):
-        s = s[2:]
+    if cleaned_path.startswith("./"):
+        cleaned_path = cleaned_path[2:]
 
-    if s.startswith("/"):
-        s = s[1:]
+    if cleaned_path.startswith("/"):
+        cleaned_path = cleaned_path[1:]
 
-    return s or None
+    return cleaned_path or None
 
 
 def _read_snippet(
@@ -267,7 +267,7 @@ def _render_no_findings(tool_result: dict) -> list[str]:
     list[str]
         Markdown lines for the no-findings summary.
     """
-    vc = tool_result.get("violation_count", 0)
+    violation_count = tool_result.get("violation_count", 0)
     executed = tool_result.get("executed", False)
     runtime_error = tool_result.get("runtime_error", False)
     meta = tool_result.get("metadata") or {}
@@ -277,7 +277,7 @@ def _render_no_findings(tool_result: dict) -> list[str]:
         "",
         f"- **Executed:**        `{executed}`",
         f"- **Runtime error:**   `{runtime_error}`",
-        f"- **Violation count:** `{vc}`",
+        f"- **Violation count:** `{violation_count}`",
     ]
 
     if meta:

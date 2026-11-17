@@ -6,8 +6,14 @@ Verify that detailed reports preserve actionable findings,
 redact secret-scanner values, and do not modify the original data.
 """
 
+import json
 import unittest
 from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from quality.CI.tests.report_fixtures import blocking_scan, github_environment
 
 from quality.CI.gate.report.report_diagnostics import (
     REDACTION_MARKER,
@@ -16,86 +22,63 @@ from quality.CI.gate.report.report_diagnostics import (
 from quality.CI.gate.report.render_report.report_builder import (
     build_html_report,
 )
-import json
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 from quality.CI.gate.report import report as report_module
+from quality.CI.gate.parsers.semgrep import parse_semgrep
+from quality.CI.gate.report.render_report.report_rows import finding_row
+from quality.CI.gate.report.report_diagnostics import (
+    _safe_analysis_rule,
+    _safe_secret_finding_path,
+)
+
+
+def _initialize_diagnostic_fixture():
+    """Build shared diagnostic-report fixture data."""
+    secret = "_".join(
+        ("EPMS", "SYNTHETIC", "SECRET", "123456789")
+    )
+
+    evaluated = {
+        "overall_block": True,
+        "blocking_results": [
+            blocking_scan("gitleaks", "high", [{
+                "severity": "high",
+                "file": "backend/application.properties",
+                "line": 18,
+                "rule": "generic-api-key",
+                "message": "Generic API key detected",
+                "rule_url": "",
+            }]),
+            blocking_scan("pylint", "medium", [{
+                "severity": "medium",
+                "file": "quality/CI/gate/gate.py",
+                "line": 42,
+                "rule": "unused-import",
+                "message": "Unused import detected",
+                "rule_url": "",
+            }]),
+        ],
+        "non_blocking_results": [],
+    }
+
+    env = github_environment(event_name="push", scan_root=".")
+
+    return secret, evaluated, env
+
+
 
 
 class DiagnosticReportTests(unittest.TestCase):
+    """Verify secret redaction and diagnostic rendering."""
 
     def setUp(self):
-        self.secret = "_".join(
-            ("EPMS", "SYNTHETIC", "SECRET", "123456789")
+        """Initialize the shared diagnostic fixture."""
+        self.secret, self.evaluated, self.env = (
+            _initialize_diagnostic_fixture()
         )
 
-        self.evaluated = {
-            "overall_block": True,
-            "blocking_results": [
-                {
-                    "tool": "gitleaks",
-                    "blocking": True,
-                    "policy_violation": True,
-                    "reason": "",
-                    "normalized": {
-                        "executed": True,
-                        "runtime_error": False,
-                        "violation_count": 1,
-                        "severity_counts": {"high": 1},
-                        "findings": [
-                            {
-                                "severity": "high",
-                                "file": "backend/application.properties",
-                                "line": 18,
-                                "rule": "generic-api-key",
-                                "message": "Generic API key detected",
-                                "rule_url": "",
-                            }
-                        ],
-                    },
-                },
-                {
-                    "tool": "pylint",
-                    "blocking": True,
-                    "policy_violation": True,
-                    "reason": "",
-                    "normalized": {
-                        "executed": True,
-                        "runtime_error": False,
-                        "violation_count": 1,
-                        "severity_counts": {"medium": 1},
-                        "findings": [
-                            {
-                                "severity": "medium",
-                                "file": "quality/CI/gate/gate.py",
-                                "line": 42,
-                                "rule": "unused-import",
-                                "message": "Unused import detected",
-                                "rule_url": "",
-                            }
-                        ],
-                    },
-                },
-            ],
-            "non_blocking_results": [],
-        }
-
-        self.env = {
-            "event_name": "push",
-            "run_number": "123",
-            "run_id": "456789",
-            "sha": "a" * 40,
-            "server_url": "https://github.com",
-            "repository": (
-                "jas812000/enterprise-project-management-system"
-            ),
-            "scan_root": ".",
-        }
-
-
     def test_secret_scanner_redaction_marker(self):
+        """Verify secret scanner redaction marker."""
         diagnostic = prepare_diagnostic_document(self.evaluated)
 
         finding = diagnostic["blocking_results"][0][
@@ -108,6 +91,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_non_secret_finding_preserved(self):
+        """Verify non secret finding preserved."""
         diagnostic = prepare_diagnostic_document(self.evaluated)
 
         finding = diagnostic["blocking_results"][1][
@@ -118,11 +102,13 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertEqual(finding["line"], 42)
         self.assertEqual(
             finding["message"],
-            "An imported module or name is not used. Remove the unused import or use it where intended.",
+            "An imported module or name is not used. "
+            "Remove the unused import or use it where intended.",
         )
 
 
     def test_original_document_not_modified(self):
+        """Verify original document not modified."""
         original = deepcopy(self.evaluated)
 
         prepare_diagnostic_document(self.evaluated)
@@ -131,6 +117,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_diagnostic_html_contains_findings(self):
+        """Verify diagnostic html contains findings."""
         diagnostic = prepare_diagnostic_document(self.evaluated)
 
         html = build_html_report(diagnostic, self.env)
@@ -142,6 +129,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_secret_not_in_diagnostic_html(self):
+        """Verify secret not in diagnostic html."""
         diagnostic = prepare_diagnostic_document(self.evaluated)
 
         html = build_html_report(diagnostic, self.env)
@@ -299,10 +287,6 @@ class DiagnosticReportTests(unittest.TestCase):
         Only valid repository-relative paths may become
         clickable GitHub source links.
         """
-        from quality.CI.gate.report.render_report.report_rows import (
-            finding_row,
-        )
-
         commit_url = (
             "https://github.com/jas812000/"
             "enterprise-project-management-system/"
@@ -341,10 +325,6 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_source_links_reject_invalid_commit_urls(self):
         """Reject missing, untrusted, or malformed commit URLs."""
-        from quality.CI.gate.report.render_report.report_rows import (
-            finding_row,
-        )
-
         finding = {
             "severity": "medium",
             "file": "quality/CI/gate/gate.py",
@@ -438,10 +418,6 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_secret_scanner_path_validation(self):
         """Preserve safe paths and withhold suspicious paths."""
-        from quality.CI.gate.report.report_diagnostics import (
-            _safe_secret_finding_path,
-        )
-
         cases = {
             "src/config.py": "src/config.py",
             "src/./config.py": "[path withheld]",
@@ -494,6 +470,17 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertIn(REDACTION_MARKER, html)
         self.assertNotIn(self.secret, html)
 
+
+
+
+class DiagnosticReportIntegrationTests(unittest.TestCase):
+    """Verify report generation and scanner-specific diagnostics."""
+
+    def setUp(self):
+        """Initialize the shared diagnostic fixture."""
+        self.secret, self.evaluated, self.env = (
+            _initialize_diagnostic_fixture()
+        )
 
     def test_generate_report_creates_separate_outputs(self):
         """Generate summary and diagnostic reports in isolation."""
@@ -670,10 +657,6 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_analysis_rule_validator_preserves_valid_rules(self):
         """Preserve conventional non-secret scanner rule identifiers."""
-        from quality.CI.gate.report.report_diagnostics import (
-            _safe_analysis_rule,
-        )
-
         valid_rules = (
             "unused-import",
             "B101",
@@ -689,10 +672,6 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_analysis_rule_validator_rejects_suspicious_rules(self):
         """Reject malformed or potentially sensitive rule identifiers."""
-        from quality.CI.gate.report.report_diagnostics import (
-            _safe_analysis_rule,
-        )
-
         suspicious_rules = (
             f"unsafe-{self.secret}",
             "x" * 200,
@@ -776,6 +755,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_semgrep_errors_render_alongside_findings(self):
+        """Verify semgrep errors render alongside findings."""
         evaluated = deepcopy(self.evaluated)
         semgrep = deepcopy(evaluated["blocking_results"][1])
         semgrep["tool"] = "semgrep"
@@ -808,6 +788,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_semgrep_metadata_injection_is_removed(self):
+        """Verify semgrep metadata injection is removed."""
         evaluated = deepcopy(self.evaluated)
         semgrep = deepcopy(evaluated["blocking_results"][1])
         semgrep["tool"] = "semgrep"
@@ -835,8 +816,7 @@ class DiagnosticReportTests(unittest.TestCase):
 
 
     def test_semgrep_parser_does_not_copy_raw_error_messages(self):
-        from quality.CI.gate.parsers.semgrep import parse_semgrep
-
+        """Verify semgrep parser does not copy raw error messages."""
         with TemporaryDirectory() as folder:
             raw = {
                 "results": [],

@@ -23,7 +23,7 @@ import re
 from pathlib import PurePosixPath
 
 
-def safe_finding_path(value: object) -> str:
+def _workspace_relative_path(value: object) -> str:
     """
     Validate and normalize a scanner-reported file path.
 
@@ -69,6 +69,11 @@ def safe_finding_path(value: object) -> str:
 
         path = candidate[len(root) + 1:]
 
+    return path
+
+
+def _validate_relative_path(path: str) -> str:
+    """Validate repository-relative path components."""
     # Reject traversal, empty components, and dot components.
     if any(part in ("", ".", "..") for part in path.split("/")):
         return "unknown"
@@ -111,3 +116,11 @@ def safe_finding_path(value: object) -> str:
         return "unknown"
 
     return normalized
+
+
+def safe_finding_path(value: object) -> str:
+    """Return a validated repository-relative scanner path or unknown."""
+    path = _workspace_relative_path(value)
+    if path == "unknown":
+        return path
+    return _validate_relative_path(path)

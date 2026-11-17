@@ -7,6 +7,7 @@ unsafe URLs and injected environment metadata.
 
 import unittest
 from copy import deepcopy
+from quality.CI.tests.report_fixtures import blocking_scan, github_environment
 from quality.CI.gate.report.report_md import (
     PR_COMMENT_MARKER,
     build_markdown_report,
@@ -24,27 +25,21 @@ class ReportSecurityTests(unittest.TestCase):
 
 
     def setUp(self):
+        """Set up the test fixture."""
         self.evaluated = {
             "overall_block": False,
             "blocking_results": [],
             "non_blocking_results": [],
         }
 
-        self.env = {
-            "event_name": "pull_request",
-            "run_number": "123",
-            "run_id": "456789",
-            "sha": "a" * 40,
-            "server_url": "https://github.com",
-            "repository": (
-                "jas812000/enterprise-project-management-system"
-            ),
-            "scan_root": "backend",
-            "actor": "developer",
-            "head_ref": "feature/test",
-            "base_ref": "main",
-            "pr_number": "42",
-        }
+        self.env = github_environment(
+            event_name="pull_request",
+            scan_root="backend",
+            actor="developer",
+            head_ref="feature/test",
+            base_ref="main",
+            pr_number="42",
+        )
 
 
     def test_valid_github_urls(self):
@@ -210,28 +205,14 @@ class ReportSecurityTests(unittest.TestCase):
         evaluated = deepcopy(self.evaluated)
         evaluated["overall_block"] = True
         evaluated["blocking_results"] = [
-            {
-                "tool": "gitleaks",
-                "blocking": True,
-                "policy_violation": True,
-                "reason": "",
-                "normalized": {
-                    "executed": True,
-                    "runtime_error": False,
-                    "violation_count": 1,
-                    "severity_counts": {"critical": 1},
-                    "findings": [
-                        {
-                            "severity": "critical",
-                            "file": f"config/{synthetic_secret}.txt",
-                            "line": 12,
-                            "rule": "generic-api-key",
-                            "message": synthetic_secret,
-                            "rule_url": "",
-                        }
-                    ],
-                },
-            }
+            blocking_scan("gitleaks", "critical", [{
+                "severity": "critical",
+                "file": f"config/{synthetic_secret}.txt",
+                "line": 12,
+                "rule": "generic-api-key",
+                "message": synthetic_secret,
+                "rule_url": "",
+            }]),
         ]
 
         # Simulate the publication boundary in report.py.

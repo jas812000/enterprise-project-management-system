@@ -10,9 +10,10 @@ summary_row(result) -> str
 """
 
 import re
-from urllib.parse import quote, urlsplit
 from html import escape
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse, urlsplit
+
+from quality.shared.reporting.result_summary import summary_fields
 from quality.CI.gate.report.report_constants import CATEGORY_MAP
 from quality.CI.gate.report.render_report.report_badges import (
     tool_status,
@@ -59,38 +60,8 @@ def _safe_source_base(commit_url: str) -> str:
     )
 
 
-def finding_row(finding: dict, commit_url: str = "") -> str:
-    """Render a finding row with HTML-safe values."""
-
-    severity_raw = str(finding.get("severity", ""))
-    message_raw = str(finding.get("message", "—"))
-    file_raw = str(finding.get("file", "—"))
-    line_raw = str(finding.get("line", "—"))
-    rule_raw = str(finding.get("rule", "—"))
-    rule_url_raw = str(finding.get("rule_url", ""))
-
-    severity = escape(severity_raw, quote=True)
-    message = escape(message_raw, quote=True)
-    file_path = escape(file_raw, quote=True)
-    line = escape(line_raw, quote=True)
-    rule = escape(rule_raw, quote=True)
-
-    parsed_url = urlparse(rule_url_raw)
-
-    if parsed_url.scheme in ("https", "http") and parsed_url.netloc:
-        safe_url = escape(rule_url_raw, quote=True)
-        rule_cell = (
-            f'<a href="{safe_url}" target="_blank" '
-            f'rel="noopener noreferrer">{rule}</a>'
-        )
-    else:
-        rule_cell = rule
-
-    search_text = escape(
-        f"{file_raw} {rule_raw} {message_raw}".lower(),
-        quote=True,
-    )
-
+def _finding_file_cell(finding: dict, file_raw: str, file_path: str, commit_url: str) -> str:
+    """Build a safe GitHub source link for a finding path."""
     # Only link repository-relative paths to a validated commit.
     safe_path = (
         isinstance(finding.get("file"), str)
@@ -106,7 +77,8 @@ def finding_row(finding: dict, commit_url: str = "") -> str:
 
 
     safe_line = (
-        type(finding.get("line")) is int
+        isinstance(finding.get("line"), int)
+        and not isinstance(finding.get("line"), bool)
         and 1 <= finding["line"] <= 10_000_000
     )
 
@@ -127,6 +99,45 @@ def finding_row(finding: dict, commit_url: str = "") -> str:
         )
     else:
         file_cell = f"<code>{file_path}</code>"
+
+    return file_cell
+
+
+def _rule_cell(rule_raw: str, rule_url_raw: str) -> str:
+    """Render a safe rule link when its URL uses HTTP(S)."""
+    rule = escape(rule_raw, quote=True)
+    parsed_url = urlparse(rule_url_raw)
+    if parsed_url.scheme in ("https", "http") and parsed_url.netloc:
+        safe_url = escape(rule_url_raw, quote=True)
+        return (
+            f'<a href="{safe_url}" target="_blank" '
+            f'rel="noopener noreferrer">{rule}</a>'
+        )
+    return rule
+
+
+def finding_row(finding: dict, commit_url: str = "") -> str:
+    """Render a finding row with HTML-safe values."""
+
+    severity_raw = str(finding.get("severity", ""))
+    message_raw = str(finding.get("message", "—"))
+    file_raw = str(finding.get("file", "—"))
+    line_raw = str(finding.get("line", "—"))
+    rule_raw = str(finding.get("rule", "—"))
+    rule_url_raw = str(finding.get("rule_url", ""))
+
+    severity = escape(severity_raw, quote=True)
+    message = escape(message_raw, quote=True)
+    file_path = escape(file_raw, quote=True)
+    line = escape(line_raw, quote=True)
+    rule_cell = _rule_cell(rule_raw, rule_url_raw)
+
+    search_text = escape(
+        f"{file_raw} {rule_raw} {message_raw}".lower(),
+        quote=True,
+    )
+
+    file_cell = _finding_file_cell(finding, file_raw, file_path, commit_url)
 
     return (
         f'<tr class="finding-row" '
@@ -152,12 +163,7 @@ def summary_row(result: dict) -> str:
         quote=True,
     )
 
-    violation = result.get("policy_violation", False)
-    blocking = result.get("blocking", False)
-    reason = result.get("reason", "")
-    normalized = result.get("normalized", {})
-
-    finding_count = normalized.get("violation_count", 0)
+    violation, blocking, reason, finding_count = summary_fields(result)
 
     status_cell, _ = tool_status(reason, violation)
     role_cell = tool_role(blocking)

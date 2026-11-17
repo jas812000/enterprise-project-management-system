@@ -55,11 +55,12 @@ SpotBugs XML Structure
 </BugCollection>
 """
 
-from defusedxml import ElementTree as ET
-from typing import Any as XmlElement
-from defusedxml.common import DefusedXmlException
-from pathlib import Path
 
+from pathlib import Path
+from typing import Any as XmlElement
+
+
+from quality.shared.artifact_io import load_xml_with_error, prepare_artifact, record_findings
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -91,13 +92,7 @@ def _load_spotbugs_root(artifact: Path, result: dict) -> XmlElement | None:
     XmlElement | None
         Parsed XML root element, or None on failure.
     """
-    try:
-        tree = ET.parse(artifact)
-        return tree.getroot()
-    except (ET.ParseError, DefusedXmlException, OSError, TypeError, ValueError, KeyError) as error:
-        result["runtime_error"] = True
-        result["metadata"]["error"] = f"SpotBugs parse error: {error}"
-        return None
+    return load_xml_with_error(artifact, result, "SpotBugs")
 
 
 def _extract_source_info(bug: XmlElement) -> tuple[str, int]:
@@ -228,13 +223,8 @@ def parse_spotbugs(raw_dir: Path) -> dict:
     result = base_tool_result("spotbugs")
     artifact = raw_dir / "spotbugs.xml"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
 
     root = _load_spotbugs_root(artifact, result)
     if root is None:
@@ -247,8 +237,8 @@ def parse_spotbugs(raw_dir: Path) -> dict:
         result["severity_counts"][normalized_severity] += 1
         findings.append(finding)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    record_findings(
+        result, findings, determine_max_severity(result["severity_counts"])
+    )
 
     return result

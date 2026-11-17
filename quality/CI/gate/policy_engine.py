@@ -71,8 +71,8 @@ def load_policy() -> tuple[dict, dict]:
     tools_cfg:
         Per-tool enforcement configuration.
     """
-    with open(POLICY_FILE, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+    with open(POLICY_FILE, "r", encoding="utf-8") as file_handle:
+        data = yaml.safe_load(file_handle) or {}
 
     return data.get("gate", {}) or {}, data.get("tools", {}) or {}
 
@@ -91,8 +91,8 @@ def load_normalized() -> tuple[list[dict], dict]:
     summary:
         Top-level summary information from normalized results.
     """
-    with open(NORMALIZED_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    with open(NORMALIZED_FILE, "r", encoding="utf-8") as file_handle:
+        data = json.load(file_handle)
 
     results = data.get("results", [])
 
@@ -343,8 +343,8 @@ def evaluate() -> bool:
         "non_blocking_results": non_blocking_results,
     }
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(evaluated_doc, f, indent=2)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as file_handle:
+        json.dump(evaluated_doc, file_handle, indent=2)
 
     _print_summary(blocking_results, non_blocking_results, overall_block)
 

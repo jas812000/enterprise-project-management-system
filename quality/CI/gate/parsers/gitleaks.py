@@ -18,7 +18,9 @@ They must never appear in findings, metadata, or any output artifact.
 
 import json
 from pathlib import Path
+import re
 from quality.CI.gate.parsers.path_safety import safe_finding_path
+from quality.shared.artifact_io import append_finding, finish_findings
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -138,7 +140,6 @@ def _build_gitleaks_finding(record: dict) -> tuple[dict, str]:
 
     Returns the normalized finding and severity.
     """
-    import re
 
     safe_descriptions = {
         "generic-api-key": "Generic API key detected",
@@ -255,11 +256,8 @@ def parse_gitleaks(raw_dir: Path) -> dict:
 
         finding, normalized_severity = _build_gitleaks_finding(record)
 
-        result["severity_counts"][normalized_severity] += 1
-        findings.append(finding)
+        append_finding(result, findings, finding, normalized_severity)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    finish_findings(result, findings, determine_max_severity)
 
     return result

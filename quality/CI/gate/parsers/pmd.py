@@ -60,11 +60,19 @@ PMD XML Structure
 </pmd>
 """
 
-from defusedxml import ElementTree as ET
-from typing import Any as XmlElement
-from defusedxml.common import DefusedXmlException
-from pathlib import Path
 
+from pathlib import Path
+from typing import Any as XmlElement
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
+
+from quality.shared.artifact_io import (
+    iter_xml_files,
+    finish_findings,
+    append_finding,
+    prepare_artifact,
+)
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -204,13 +212,8 @@ def parse_pmd(raw_dir: Path) -> dict:
     result = base_tool_result("pmd")
     artifact = raw_dir / "pmd.xml"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
 
     root = _load_pmd_root(artifact, result)
     if root is None:
@@ -218,16 +221,12 @@ def parse_pmd(raw_dir: Path) -> dict:
 
     findings: list[dict] = []
 
-    for file_node in root.findall("file"):
-        file_path = file_node.attrib.get("name", "unknown")
+    for file_path, file_node in iter_xml_files(root):
 
         for violation in file_node.findall("violation"):
             finding, normalized_severity = _build_pmd_finding(file_path, violation)
-            result["severity_counts"][normalized_severity] += 1
-            findings.append(finding)
+            append_finding(result, findings, finding, normalized_severity)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    finish_findings(result, findings, determine_max_severity)
 
     return result

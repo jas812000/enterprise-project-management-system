@@ -88,8 +88,8 @@ def parse_trivy(raw_dir: Path) -> dict:
     result["executed"]         = True
 
     try:
-        with open(artifact, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(artifact, encoding="utf-8") as file_handle:
+            data = json.load(file_handle)
 
         findings  = []
         scan_results = data.get("Results", [])
@@ -127,12 +127,12 @@ def parse_trivy(raw_dir: Path) -> dict:
         result["violation_count"] = len(findings)
         result["max_severity"]    = determine_max_severity(result["severity_counts"])
 
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError as error:
         result["runtime_error"]     = True
-        result["metadata"]["error"] = f"JSON parse error: {e}"
+        result["metadata"]["error"] = f"JSON parse error: {error}"
     # Preserve the parser contract for unexpected failures.
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as error:  # pylint: disable=broad-except
         result["runtime_error"]     = True
-        result["metadata"]["error"] = f"Unexpected error: {e}"
+        result["metadata"]["error"] = f"Unexpected error: {error}"
 
     return result

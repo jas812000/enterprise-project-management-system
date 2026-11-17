@@ -1,0 +1,13 @@
+
+# EPMS BN1 Python scanner dependencies
+# Verified with Python 3.11.1 on the Intel iMac.
+
+pylint==2.15.10
+bandit==1.7.4
+
+# Runtime dependency required by Bandit 1.7.4.
+pbr==7.1.3
+defusedxml==0.7.1
+
+# Used by quality/CI/gate/report/report_github.py
+requests==2.32.3

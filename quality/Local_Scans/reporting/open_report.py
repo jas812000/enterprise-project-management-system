@@ -28,7 +28,7 @@ def main():
     try:
         opened = webbrowser.open(REPORT.resolve().as_uri())
     # Browser-launch failures must not fail the quality report.
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:  # pylint: disable=broad-except
         print(
             f"WARNING: Unable to open HTML report: {exc}",
             file=sys.stderr,
