@@ -661,6 +661,9 @@ jobs:
 
           echo "Pylint: analyzing ${#PY_FILES[@]} Python file(s)."
 
+          # Make repository-root Python packages resolvable by Pylint.
+          export PYTHONPATH="${GITHUB_WORKSPACE}${PYTHONPATH:+:${PYTHONPATH}}"
+
           PYLINT_EXIT=0
 
           pylint "${PY_FILES[@]}" \
