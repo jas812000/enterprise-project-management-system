@@ -1,4 +1,4 @@
-"""Raw report filenames for EPMS CI scanners."""
+"""Raw report filenames for CI scanners."""
 
 SCANNER_ARTIFACTS = {
     "trufflehog": "trufflehog.jsonl",

@@ -1,5 +1,5 @@
 """
-Metadata block renderers for the EPMS Quality Gate HTML report.
+Metadata block renderers for the CI Quality Gate HTML report.
 
 Functions
 ---------

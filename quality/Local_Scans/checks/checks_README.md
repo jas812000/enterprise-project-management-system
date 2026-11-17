@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The `checks/` directory contains the scanner execution scripts used by the EPMS Local Quality Gate (BN1).
+The `checks/` directory contains the scanner execution scripts used by the Local Quality Gate (BN1).
 
 Each script executes one static analysis tool against the Java backend, generates machine-readable results, and returns a standardized exit code.
 

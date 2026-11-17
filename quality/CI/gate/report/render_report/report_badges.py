@@ -1,5 +1,5 @@
 """
-Badge and pill renderers for the EPMS Quality Gate HTML report.
+Badge and pill renderers for the CI Quality Gate HTML report.
 
 Functions
 ---------

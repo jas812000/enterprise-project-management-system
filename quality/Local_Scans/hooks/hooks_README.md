@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The `hooks/` directory contains Git hooks used to integrate the EPMS Local Quality Gate (BN1) into the development workflow.
+The `hooks/` directory contains Git hooks used to integrate the Local Quality Gate (BN1) into the development workflow.
 
 The pre-commit hook automatically executes the local quality checks before Git creates a commit.
 

@@ -1,6 +1,6 @@
 
 """
-Generate the EPMS Local Quality Gate HTML report.
+Generate the Local Quality Gate HTML report.
 
 Reads the existing Java scanner reports and the normalized
 nine-scanner results produced by the local pipeline.

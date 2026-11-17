@@ -1,5 +1,5 @@
 """
-EPMS Local Quality Gate report parsers.
+Local Quality Gate report parsers.
 
 Parses raw scanner artifacts and returns normalized findings
 and severity counts.

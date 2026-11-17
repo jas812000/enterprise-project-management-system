@@ -4,7 +4,7 @@ Scanner File Path Validation
 
 Purpose
 -------
-Validate and normalize file paths reported by EPMS CI security
+Validate and normalize file paths reported by CI security
 and static-analysis scanners.
 
 Behavior

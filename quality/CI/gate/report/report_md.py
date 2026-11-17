@@ -180,7 +180,7 @@ def build_markdown_report(evaluated_doc: dict, env: dict) -> str:
     )
 
     lines: list[str] = [
-        "# EPMS Quality Gate Report",
+        "# CI Quality Gate Report",
         "",
         approval_line,
         "",

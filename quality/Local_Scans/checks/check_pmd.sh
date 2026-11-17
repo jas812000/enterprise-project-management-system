@@ -26,7 +26,7 @@ REPO_ROOT="$1"
 WORK_DIR="$2"
 TOOLS_DIR="$3"
 
-JAVA_SRC="${REPO_ROOT}/backend/src/main/java"
+JAVA_SRC="${QUALITY_JAVA_SOURCE:-${REPO_ROOT}/backend/src/main/java}"
 
 PMD_VERSION="7.29.0"
 PMD_DIR="${TOOLS_DIR}/pmd-bin-${PMD_VERSION}"
@@ -57,7 +57,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if [ ! -d "${JAVA_SRC}" ]; then
-  echo "ERROR: EPMS Java source directory not found: ${JAVA_SRC}" >&2
+  echo "ERROR: Java source directory not found: ${JAVA_SRC}" >&2
   exit 2
 fi
 

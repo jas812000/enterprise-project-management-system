@@ -1,5 +1,5 @@
 #!/bin/sh
-# EPMS Local Quality Gate — SpotBugs
+# Local Quality Gate — SpotBugs
 #
 # Arguments:
 #   $1 - REPO_ROOT
@@ -24,7 +24,7 @@ REPO_ROOT="$1"
 WORK_DIR="$2"
 TOOLS_DIR="$3"
 
-BACKEND_DIR="${REPO_ROOT}/backend"
+BACKEND_DIR="${QUALITY_MAVEN_DIR:-${REPO_ROOT}/backend}"
 CLASSES="${BACKEND_DIR}/target/classes"
 
 VERSION="4.10.5"
@@ -111,7 +111,7 @@ PY
     error "Unable to make SpotBugs executable."
 fi
 
-echo "Compiling EPMS backend..."
+echo "Compiling configured Maven project..."
 
 (
   cd "${BACKEND_DIR}"

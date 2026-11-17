@@ -1,12 +1,13 @@
 
 """
-Regression tests for EPMS secret scanner security.
+Regression tests for secret scanner security.
 
 Verify that Gitleaks and TruffleHog exclude sensitive
 scanner metadata and that file paths are validated.
 """
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,7 +31,25 @@ REMOTE_JDBC = JDBC_PREFIX + "db.example.com:5432/epms"
 
 
 class SecretScannerSecurityTests(unittest.TestCase):
-    """Regression tests for the corresponding EPMS quality component."""
+    """Check scanner normalization, redaction, and exact JDBC exceptions."""
+    def setUp(self):
+        """Use explicit EPMS configuration for approved JDBC regression fixtures."""
+        self._previous_config = os.environ.get("QUALITY_CONFIG")
+        self._previous_workspace = os.environ.get("GITHUB_WORKSPACE")
+        workspace = Path(__file__).resolve().parents[3]
+        os.environ["GITHUB_WORKSPACE"] = str(workspace)
+        os.environ["QUALITY_CONFIG"] = str(workspace / "quality/project.json")
+
+    def tearDown(self):
+        previous = (
+            ("QUALITY_CONFIG", self._previous_config),
+            ("GITHUB_WORKSPACE", self._previous_workspace),
+        )
+        for key, value in previous:
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
     def test_gitleaks_excludes_sensitive_metadata(self):
         """Verify gitleaks excludes sensitive metadata."""

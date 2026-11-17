@@ -1,5 +1,5 @@
 """
-EPMS Quality Gate Diagnostic Report Preparation
+CI Quality Gate Diagnostic Report Preparation
 
 Purpose
 -------

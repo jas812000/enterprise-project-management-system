@@ -1,4 +1,4 @@
-# EPMS CI Quality Gate Engine
+# CI Quality Gate Engine
 
 ## Overview
 
