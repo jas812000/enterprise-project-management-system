@@ -17,7 +17,9 @@ Each finding dictionary contains:
   message  — human-readable description
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from typing import Any as XmlElement
+from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
 
@@ -37,7 +39,7 @@ def _empty_sev() -> dict:
     return {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
 
 
-def _strip_namespace(root: ET.Element) -> str:
+def _strip_namespace(root: XmlElement) -> str:
     """Extract namespace prefix from root tag if present."""
     if root.tag.startswith("{"):
         return root.tag.split("}")[0] + "}"
@@ -87,7 +89,7 @@ def parse_checkstyle(path: Path, repo_root: str) -> tuple[list, dict]:
                         "message": err.get("message", ""),
                     }
                 )
-    except (OSError, ET.ParseError, ValueError) as error:
+    except (OSError, ET.ParseError, DefusedXmlException, ValueError) as error:
         raise RuntimeError(
             f"Unable to parse Checkstyle report '{path}': {error}"
         ) from error
@@ -143,7 +145,7 @@ def parse_pmd(path: Path, repo_root: str) -> tuple[list, dict]:
                         "message": (violation.text or "").strip(),
                     }
                 )
-    except (OSError, ET.ParseError, ValueError) as error:
+    except (OSError, ET.ParseError, DefusedXmlException, ValueError) as error:
         raise RuntimeError(
             f"Unable to parse PMD report '{path}': {error}"
         ) from error
@@ -197,7 +199,7 @@ def parse_spotbugs(path: Path) -> tuple[list, dict]:
                     "message": (bug.findtext(f"{ns}ShortMessage") or "").strip(),
                 }
             )
-    except (OSError, ET.ParseError, ValueError) as error:
+    except (OSError, ET.ParseError, DefusedXmlException, ValueError) as error:
         raise RuntimeError(
             f"Unable to parse SpotBugs report '{path}': {error}"
         ) from error
