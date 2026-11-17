@@ -1,1 +1,5 @@
-# pylint: disable=invalid-name  # Established uppercase CI package name.
+"""CI Quality Gate package.
+
+The uppercase CI directory name is retained for compatibility with
+existing imports and GitHub Actions workflows.
+"""

@@ -692,6 +692,7 @@ jobs:
           PYLINT_EXIT=0
 
           pylint "${PY_FILES[@]}" \
+            --rcfile="${GITHUB_WORKSPACE}/.pylintrc" \
             --output-format=json \
             > "${OUT}" || PYLINT_EXIT=$?
 

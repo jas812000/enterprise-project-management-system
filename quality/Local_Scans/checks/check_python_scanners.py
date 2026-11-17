@@ -71,9 +71,17 @@ def run_selected(repo_root, work_dir, scanner):
     if scanner == "pylint":
         completed = run_json_scanner(
             "pylint",
-            [sys.executable, "-m", "pylint", *files,
-             "--output-format=json", "--good-names-rgxs=^CI$"],
-            work_dir, "pylint.json", ScannerValidation(set(range(32)), valid_pylint, environment),
+            [
+                sys.executable,
+                "-m",
+                "pylint",
+                *files,
+                f"--rcfile={repo_root / '.pylintrc'}",
+                "--output-format=json",
+            ],
+            work_dir,
+            "pylint.json",
+            ScannerValidation(set(range(32)), valid_pylint, environment),
         )
     else:
         completed = run_json_scanner(
