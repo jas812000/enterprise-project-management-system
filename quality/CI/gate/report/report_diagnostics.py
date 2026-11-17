@@ -444,12 +444,12 @@ def prepare_diagnostic_document(evaluated_doc: dict) -> dict:
             # Never publish raw scanner error descriptions.
             # Keep the runtime-error state for troubleshooting.
             if normalized.get("runtime_error", False):
-                 normalized["metadata"] = {
-                     "error": (
-                         "Secret scanner encountered a runtime error. "
-                         "Review the GitHub Actions execution logs."
-                     )
-                 }
+                normalized["metadata"] = {
+                    "error": (
+                        "Secret scanner encountered a runtime error. "
+                        "Review the GitHub Actions execution logs."
+                    )
+                }
             else:
                 normalized["metadata"] = {}
 

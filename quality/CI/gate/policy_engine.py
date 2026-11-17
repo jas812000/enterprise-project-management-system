@@ -222,7 +222,6 @@ def _evaluate_tool(tool_result: dict, tool_policy: dict) -> tuple[bool, str | No
     fail_rules = tool_policy.get("fail_on", {}) or {}
 
     violation_count = int(tool_result.get("violation_count", 0) or 0)
-    severity_counts = tool_result.get("severity_counts", {}) or {}
     max_sev = tool_result.get("max_severity")
 
     reason = _first_violation([

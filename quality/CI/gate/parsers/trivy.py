@@ -130,7 +130,8 @@ def parse_trivy(raw_dir: Path) -> dict:
     except json.JSONDecodeError as e:
         result["runtime_error"]     = True
         result["metadata"]["error"] = f"JSON parse error: {e}"
-    except Exception as e:
+    # Preserve the parser contract for unexpected failures.
+    except Exception as e:  # pylint: disable=broad-exception-caught
         result["runtime_error"]     = True
         result["metadata"]["error"] = f"Unexpected error: {e}"
 

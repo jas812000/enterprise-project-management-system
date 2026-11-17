@@ -25,7 +25,7 @@ class TestReportStatus(unittest.TestCase):
     def test_failed_scanner_calls_parser(self):
         expected = ([{"rule": "Violation"}], {"medium": 1})
 
-        def parser(path):
+        def parser(_path):
             return expected
 
         result = parse_scanner_report(
@@ -35,7 +35,7 @@ class TestReportStatus(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_error_scanner_skips_parser(self):
-        def parser(path):
+        def parser(_path):
             self.fail("Parser must not execute for scanner errors.")
 
         findings, severity = parse_scanner_report(
@@ -50,7 +50,7 @@ class TestReportStatus(unittest.TestCase):
         )
 
     def test_skipped_scanner_skips_parser(self):
-        def parser(path):
+        def parser(_path):
             self.fail("Parser must not execute for skipped scanners.")
 
         findings, severity = parse_scanner_report(

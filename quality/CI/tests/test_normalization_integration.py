@@ -63,7 +63,7 @@ class NormalizationIntegrationTests(unittest.TestCase):
     def test_completed_scanner_preserves_findings(self):
         self.write_status("semgrep", "completed", exit_code=0)
 
-        def parser(raw_dir):
+        def parser(_raw_dir):
             result = base_tool_result("semgrep")
             result["artifact_present"] = True
             result["executed"] = True
@@ -117,7 +117,7 @@ class NormalizationIntegrationTests(unittest.TestCase):
         self.assertTrue(result["runtime_error"])
 
     def test_missing_status_fails_closed(self):
-        def parser(raw_dir):
+        def parser(_raw_dir):
             result = base_tool_result("semgrep")
             result["artifact_present"] = True
             result["executed"] = True

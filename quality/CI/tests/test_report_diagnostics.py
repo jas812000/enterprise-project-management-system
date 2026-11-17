@@ -385,9 +385,6 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_secret_scanner_metadata_always_sanitized(self):
         """Remove raw secret-scanner metadata without a runtime error."""
-        from quality.CI.gate.report.report_diagnostics import (
-            prepare_diagnostic_document,
-        )
 
         secret = "_".join(("SENSITIVE", "TEST", "CREDENTIAL", "12345"))
 

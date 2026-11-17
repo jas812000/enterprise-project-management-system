@@ -178,7 +178,8 @@ def normalize() -> list[dict]:
 
             results.append(result)
 
-        except Exception as error:
+        # Preserve scanner isolation and report unexpected failures.
+        except Exception as error:  # pylint: disable=broad-exception-caught
             error_result = base_tool_result(tool_name)
             error_result["executed"] = False
             error_result["runtime_error"] = True
