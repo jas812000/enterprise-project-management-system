@@ -80,7 +80,7 @@ def integrate(
 
     # Stage raw scanner output outside the repository during
     # execution. This prevents scanning newly generated secrets.
-    with TemporaryDirectory(prefix="epms-bn1-") as temporary:
+    with TemporaryDirectory(prefix="quality-bn1-") as temporary:
         staging = Path(temporary)
 
         run_additional(repo_root, staging, tools_dir)

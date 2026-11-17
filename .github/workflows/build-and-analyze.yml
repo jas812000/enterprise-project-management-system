@@ -130,6 +130,21 @@ jobs:
       # pylint   → Python static analysis
       # bandit   → Python security SAST
       # ----------------------------------------------------------
+      - name: Load Quality Gate Project Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG="${GITHUB_WORKSPACE}/quality/project.json"
+          if [[ -f "${CONFIG}" ]]; then
+            eval "$(python3 quality/project_config.py --shell "${GITHUB_WORKSPACE}" "${CONFIG}")"
+            for key in QUALITY_JAVA_SOURCE QUALITY_MAVEN_DIR QUALITY_SCAN_ROOT QUALITY_PYTHON_SOURCE QUALITY_JS_SOURCE QUALITY_PROJECT_NAME QUALITY_JAVA_VERSION QUALITY_CONFIG; do
+              printf "%s=%s\n" "$key" "${!key}" >> "$GITHUB_ENV"
+            done
+            echo "Project configuration loaded."
+          else
+            echo "No project.json; legacy scan-root discovery remains active."
+          fi
+
       - name: Install Python Dependencies
         shell: bash
         run: |
@@ -167,48 +182,58 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="${GITHUB_WORKSPACE}/${SCAN_ROOT}"
+          # Configured paths are authoritative, including explicitly empty roots.
+          if [[ -n "${QUALITY_CONFIG:-}" ]]; then
+            ROOT="${QUALITY_SCAN_ROOT}"
+            JAVA_ROOT="${QUALITY_MAVEN_DIR}"
+            JS_ROOT="${QUALITY_JS_SOURCE}"
+            PY_ROOT="${QUALITY_PYTHON_SOURCE}"
+          else
+            ROOT="${GITHUB_WORKSPACE}/${SCAN_ROOT}"
+            if [[ ! -d "${ROOT}" ]]; then
+              echo "::error::SCAN_ROOT does not exist"; exit 1
+            fi
+            JAVA_POM="$(find "${ROOT}" -maxdepth 6 -name pom.xml -print -quit || true)"
+            JAVA_ROOT=""
+            if [[ -n "${JAVA_POM}" ]]; then
+              JAVA_ROOT="$(dirname "${JAVA_POM}")"
+            else
+              JAVA_SRC="$(find "${ROOT}" -maxdepth 8 -type d -path '*/src/main/java' -print -quit || true)"
+              if [[ -n "${JAVA_SRC}" ]]; then
+                JAVA_ROOT="$(dirname "$(dirname "$(dirname "${JAVA_SRC}")")")"
+              fi
+            fi
+            JS_ROOT="$(find "${ROOT}" -maxdepth 4 -name package.json \
+              ! -path '*/node_modules/*' -print -quit | xargs -r dirname || true)"
+            PY_ROOT=""
+            if find "${ROOT}" -type f -name '*.py' \
+              ! -path '*/.venv/*' ! -path '*/node_modules/*' -print -quit | grep -q .; then
+              PY_ROOT="${ROOT}"
+            fi
+          fi
 
           if [[ ! -d "${ROOT}" ]]; then
-            echo "::error::SCAN_ROOT does not exist: ${ROOT}"
-            exit 1
+            echo "::error::Configured scan root does not exist"; exit 1
           fi
-
-          # Java root — directory containing pom.xml or src/main/java
-          JAVA_POM="$(find "${ROOT}" -maxdepth 6 -name pom.xml -print -quit || true)"
-          if [[ -n "${JAVA_POM}" ]]; then
-            JAVA_ROOT="$(dirname "${JAVA_POM}")"
-          else
-            JAVA_SRC="$(find "${ROOT}" -maxdepth 8 -type d -path "*/src/main/java" \
-              -print -quit || true)"
-            JAVA_ROOT="$(dirname "$(dirname "$(dirname "${JAVA_SRC:-/}")")")"
-            [[ "${JAVA_ROOT}" == "/" ]] && JAVA_ROOT=""
-          fi
-
-          # JS root — directory containing package.json (excluding node_modules)
-          JS_ROOT="$(find "${ROOT}" -maxdepth 4 -name package.json \
-            ! -path "*/node_modules/*" -print -quit \
-            | xargs -r dirname || true)"
-
-          # Python root — use RESOLVED_ROOT if any .py files exist
-          PY_COUNT="$(find "${ROOT}" -name "*.py" \
-            ! -path "*/.venv/*" ! -path "*/node_modules/*" | wc -l)"
-          if [[ "${PY_COUNT}" -gt 0 ]]; then
-            PY_ROOT="${ROOT}"
-          else
-            PY_ROOT=""
-          fi
-
-          echo "RESOLVED_ROOT=${ROOT}"         >> "$GITHUB_ENV"
-          echo "JAVA_ROOT=${JAVA_ROOT}"        >> "$GITHUB_ENV"
-          echo "JS_ROOT=${JS_ROOT}"            >> "$GITHUB_ENV"
-          echo "PY_ROOT=${PY_ROOT}"            >> "$GITHUB_ENV"
-
-          echo "SCAN_ROOT      = ${SCAN_ROOT}"
-          echo "RESOLVED_ROOT  = ${ROOT}"
-          echo "JAVA_ROOT      = ${JAVA_ROOT:-<none>}"
-          echo "JS_ROOT        = ${JS_ROOT:-<none>}"
-          echo "PY_ROOT        = ${PY_ROOT:-<none>}"
+          for configured in "${JAVA_ROOT}" "${JS_ROOT}" "${PY_ROOT}"; do
+            if [[ -n "${configured}" && ! -d "${configured}" ]]; then
+              echo "::error::Configured source directory does not exist"; exit 1
+            fi
+          done
+          case "${ROOT}" in
+            "${GITHUB_WORKSPACE}") CONTAINER_SCAN_ROOT="." ;;
+            "${GITHUB_WORKSPACE}/"*) CONTAINER_SCAN_ROOT="${ROOT#"${GITHUB_WORKSPACE}/"}" ;;
+            *) echo "::error::Scan root must be within workspace"; exit 1 ;;
+          esac
+          echo "RESOLVED_ROOT=${ROOT}" >> "$GITHUB_ENV"
+          echo "CONTAINER_SCAN_ROOT=${CONTAINER_SCAN_ROOT}" >> "$GITHUB_ENV"
+          echo "JAVA_ROOT=${JAVA_ROOT}" >> "$GITHUB_ENV"
+          echo "JS_ROOT=${JS_ROOT}" >> "$GITHUB_ENV"
+          echo "PY_ROOT=${PY_ROOT}" >> "$GITHUB_ENV"
+          echo "RESOLVED_ROOT = ${ROOT}"
+          echo "JAVA_ROOT = ${JAVA_ROOT:-<none>}"
+          echo "JS_ROOT = ${JS_ROOT:-<none>}"
+          echo "PY_ROOT = ${PY_ROOT:-<none>}"
 
       # ======================================================
       # TOOL EXECUTION
@@ -248,7 +273,7 @@ jobs:
             # Exit code 10 means secrets were detected.
             # Other nonzero codes mean execution failed.
             "${BINARY}" detect \
-              --source "${GITHUB_WORKSPACE}/${SCAN_ROOT}" \
+              --source "${RESOLVED_ROOT}" \
               --report-format json \
               --report-path "${OUT}" \
               --no-git \
@@ -316,7 +341,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/repo:ro" \
             -v "${EXCLUDE_FILE}:/tmp/trufflehog-exclude.txt:ro" \
             trufflesecurity/trufflehog:3.82.6 \
-            filesystem "/repo/${SCAN_ROOT}" \
+            filesystem "/repo/${CONTAINER_SCAN_ROOT}" \
             --exclude-paths /tmp/trufflehog-exclude.txt \
             --json \
             --no-verification \
@@ -347,7 +372,7 @@ jobs:
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ env.QUALITY_JAVA_VERSION || '25' }}
 
       # ------------------------------------------------------
       # Tool: Checkstyle (Java Style Enforcement)
@@ -355,7 +380,7 @@ jobs:
       # Output: quality/analysis/raw/checkstyle.xml
       # ------------------------------------------------------
 
-      - name: Run Checkstyle (EPMS BN1)
+      - name: Run Checkstyle (BN1)
         if: success() || failure()
         shell: bash
         run: |
@@ -363,7 +388,7 @@ jobs:
 
           REPO_ROOT="${GITHUB_WORKSPACE}"
           WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
-          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+          TOOLS_DIR="${RUNNER_TEMP}/quality-scanner-tools"
 
           OUT="${WORK_DIR}/checkstyle.xml"
           STATUS="${WORK_DIR}/checkstyle.status.json"
@@ -404,7 +429,7 @@ jobs:
       # Output: quality/analysis/raw/pmd.xml
       # ------------------------------------------------------
 
-      - name: Run PMD (EPMS BN1)
+      - name: Run PMD (BN1)
         if: success() || failure()
         shell: bash
         run: |
@@ -412,7 +437,7 @@ jobs:
 
           REPO_ROOT="${GITHUB_WORKSPACE}"
           WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
-          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+          TOOLS_DIR="${RUNNER_TEMP}/quality-scanner-tools"
 
           OUT="${WORK_DIR}/pmd.xml"
           STATUS="${WORK_DIR}/pmd.status.json"
@@ -449,14 +474,14 @@ jobs:
       # ------------------------------------------------------
       # Tool: SpotBugs (Java Bytecode Static Analysis)
       # ------------------------------------------------------
-      # Uses the existing EPMS BN1 SpotBugs scanner.
+      # Uses the existing BN1 SpotBugs scanner.
       # The BN1 script compiles the backend using Maven,
       # builds its dependency classpath, and validates XML.
       #
       # Output: quality/analysis/raw/spotbugs.xml
       # ------------------------------------------------------
 
-      - name: Run SpotBugs (EPMS BN1)
+      - name: Run SpotBugs (BN1)
         if: success() || failure()
         shell: bash
         run: |
@@ -464,7 +489,7 @@ jobs:
 
           REPO_ROOT="${GITHUB_WORKSPACE}"
           WORK_DIR="${REPO_ROOT}/quality/analysis/raw"
-          TOOLS_DIR="${RUNNER_TEMP}/epms-scanner-tools"
+          TOOLS_DIR="${RUNNER_TEMP}/quality-scanner-tools"
 
           OUT="${WORK_DIR}/spotbugs.xml"
           STATUS="${WORK_DIR}/spotbugs.status.json"
@@ -899,7 +924,7 @@ jobs:
 
           OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/stylelint.json"
           STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/stylelint.status.json"
-          TOOLS_DIR="${RUNNER_TEMP}/epms-stylelint"
+          TOOLS_DIR="${RUNNER_TEMP}/quality-stylelint"
           CONFIG="${TOOLS_DIR}/stylelint.config.cjs"
           STYLELINT="${TOOLS_DIR}/node_modules/.bin/stylelint"
 
@@ -1008,7 +1033,7 @@ jobs:
 
           OUT="${GITHUB_WORKSPACE}/quality/analysis/raw/trivy.json"
           STATUS="${GITHUB_WORKSPACE}/quality/analysis/raw/trivy.status.json"
-          TOOL_DIR="${RUNNER_TEMP}/epms-trivy"
+          TOOL_DIR="${RUNNER_TEMP}/quality-trivy"
           VERSION="0.76.2"
           ARCHIVE="trivy_${VERSION}_Linux-64bit.tar.gz"
           BASE_URL="https://github.com/aquasecurity/trivy/releases/download/v${VERSION}"
@@ -1154,7 +1179,7 @@ jobs:
           OUT="${OUT_DIR}/dependency-check-report.json"
           STATUS="${OUT_DIR}/dependency_check.status.json"
           DATA_DIR="${GITHUB_WORKSPACE}/quality/analysis/dc-data"
-          TOOL_DIR="${RUNNER_TEMP}/epms-dependency-check"
+          TOOL_DIR="${RUNNER_TEMP}/quality-dependency-check"
           VERSION="13.0.0"
           DC_EXIT=0
 
@@ -1184,7 +1209,7 @@ jobs:
 
           if [[ "${DC_EXIT}" -eq 0 ]]; then
             "${TOOL_DIR}/dependency-check/bin/dependency-check.sh" \
-              --project "EPMS" \
+              --project "${QUALITY_PROJECT_NAME:-Quality Gate}" \
               --scan "${RESOLVED_ROOT}" \
               --format JSON \
               --out "${OUT_DIR}" \

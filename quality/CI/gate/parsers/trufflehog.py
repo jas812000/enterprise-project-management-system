@@ -66,8 +66,10 @@ It must never appear in findings, metadata, or any output artifact.
 """
 
 import json
+import os
 from pathlib import Path
 
+from quality.project_config import load
 from quality.shared.severity import TRUFFLEHOG_DETECTORS
 from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.shared.artifact_io import append_finding, finish_findings
@@ -146,18 +148,18 @@ def _extract_filesystem_data(record: dict) -> dict:
 
 
 def _is_known_safe_jdbc_url(record: dict, file_path: str | None) -> bool:
-    """
-    Ignore only EPMS's known, credential-free local JDBC URL.
-
-    All other JDBC findings remain reportable.
-    Verified findings are never suppressed.
-    """
-    return (
-        record.get("DetectorName") == "JDBC"
-        and record.get("Verified") is False
-        and file_path == "backend/src/main/resources/application.properties"
-        and record.get("Raw") == ("jdbc:" + "postgresql://" + "localhost:5432/epms")
-    )
+    """Suppress only explicitly approved, unverified, exact JDBC false positives."""
+    if record.get("DetectorName") != "JDBC" or record.get("Verified") is not False:
+        return False
+    config = os.environ.get("QUALITY_CONFIG")
+    if not config:
+        return False
+    try:
+        repo = Path(os.environ.get("GITHUB_WORKSPACE", Path.cwd()))
+        rules = load(repo, Path(config))["safe_jdbc_urls"]
+    except (OSError, ValueError, TypeError):
+        return False
+    return any(rule["file"] == file_path and rule["url"] == record.get("Raw") for rule in rules)
 
 
 def _is_self_referential(file_path: str | None) -> bool:

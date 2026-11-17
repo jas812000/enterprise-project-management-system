@@ -1,13 +1,13 @@
 #!/bin/sh
 
 # ==========================================================
-# EPMS Local Quality Gate (BN1) — Entry Point
+# Local Quality Gate (BN1) — Entry Point
 # ----------------------------------------------------------
 # Runs local static analysis and security checks, generates
 # an HTML report, packages scan artifacts into a ZIP archive,
 # and opens the report in the default browser.
 #
-# Usage (from the EPMS repository root):
+# Usage (from the host repository root):
 #   sh quality/Local_Scans/run-local-checks.sh
 #
 # Scanner prerequisites and enforcement policies are
@@ -18,14 +18,20 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Optional configuration is resolved relative to the host repository.
+QUALITY_CONFIG="${QUALITY_CONFIG:-${REPO_ROOT}/quality/project.json}"
+if [ -f "${QUALITY_CONFIG}" ]; then
+  eval "$(python3 "${SCRIPT_DIR}/../project_config.py" --shell "${REPO_ROOT}" "${QUALITY_CONFIG}")"
+fi
+export QUALITY_JAVA_SOURCE QUALITY_MAVEN_DIR QUALITY_SCAN_ROOT QUALITY_PYTHON_SOURCE QUALITY_JS_SOURCE QUALITY_PROJECT_NAME QUALITY_JAVA_VERSION QUALITY_CONFIG
 CHECKS_DIR="${SCRIPT_DIR}/checks"
 REPORT_DIR="${SCRIPT_DIR}/reporting"
 TOOLS_DIR="${SCRIPT_DIR}/tools"
 OUTPUT_DIR="${SCRIPT_DIR}/reports"
 
-# Store generated scan artifacts inside the EPMS repository.
+# Store generated scan artifacts inside the host repository.
 if ! mkdir -p "${OUTPUT_DIR}"; then
-  echo "ERROR: Cannot create EPMS reports directory: ${OUTPUT_DIR}" >&2
+  echo "ERROR: Cannot create quality reports directory: ${OUTPUT_DIR}" >&2
   exit 2
 fi
 
@@ -72,7 +78,7 @@ export PYTHON_CMD
 
 TIMESTAMP="$(date '+%Y-%m-%d-%H%M%S')"
 
-# Keep scanner working files inside the EPMS reports directory.
+# Keep scanner working files inside the quality reports directory.
 WORK_DIR="${OUTPUT_DIR}/work"
 
 if ! mkdir -p "${WORK_DIR}"; then
@@ -119,7 +125,7 @@ SB_STATUS="skipped"
 # ----------------------------------------------------------
 echo ""
 echo "=============================="
-echo " EPMS Local Quality Gate (BN1)"
+echo " Local Quality Gate (BN1)"
 echo "=============================="
 
 
@@ -315,7 +321,7 @@ run_python "${REPORT_DIR}/open_report.py"
 # ----------------------------------------------------------
 echo ""
 echo "=========================================="
-echo " EPMS Local Quality Gate — Final Results"
+echo " Local Quality Gate — Final Results"
 echo "=========================================="
 
 if run_python - "${OUTPUT_DIR}/normalized/normalized.json" <<'PY'

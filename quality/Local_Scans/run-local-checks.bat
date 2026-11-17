@@ -2,7 +2,7 @@
 setlocal
 
 REM ==========================================================
-REM EPMS Local Quality Gate (BN1) - Windows Launcher
+REM Local Quality Gate (BN1) - Windows Launcher
 REM ----------------------------------------------------------
 REM Location:
 REM   quality\Local_Scans\run-local-checks.bat
@@ -72,9 +72,9 @@ set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
 if "%EXIT_CODE%"=="0" (
-    echo EPMS Local Quality Gate PASSED.
+    echo Local Quality Gate PASSED.
 ) else (
-    echo EPMS Local Quality Gate FAILED.
+    echo Local Quality Gate FAILED.
     echo Exit code: %EXIT_CODE%
 )
 

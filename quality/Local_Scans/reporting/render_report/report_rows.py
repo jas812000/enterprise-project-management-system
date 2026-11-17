@@ -1,5 +1,5 @@
 """
-Row renderers for the EPMS Local Quality Gate HTML report.
+Row renderers for the Local Quality Gate HTML report.
 """
 
 from html import escape

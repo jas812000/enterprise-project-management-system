@@ -1,5 +1,5 @@
 """
-render_report package for the EPMS Quality Gate HTML report.
+render_report package for the CI Quality Gate HTML report.
 
 Exports
 -------

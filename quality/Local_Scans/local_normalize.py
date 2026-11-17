@@ -85,7 +85,7 @@ def normalize_local(raw_dir: Path, output_file: Path) -> dict:
 def summarize_local(document: dict) -> None:
     """Print advisory results without exposing raw scanner findings."""
     print()
-    print("EPMS Local Quality Gate — Advisory Results")
+    print("Local Quality Gate — Advisory Results")
     print("------------------------------------------")
 
     for result in document["results"]:

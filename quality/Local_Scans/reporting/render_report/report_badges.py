@@ -1,5 +1,5 @@
 """
-Badge and status helper renderers for the EPMS Local Quality Gate report.
+Badge and status helper renderers for the Local Quality Gate report.
 """
 
 from .report_constants import SEVERITY_COLORS

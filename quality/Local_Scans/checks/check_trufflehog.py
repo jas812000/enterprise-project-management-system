@@ -39,19 +39,19 @@ def _stage_source(root: Path, temporary: str) -> tuple[Path, Path]:
 
     shutil.copytree(root, staging, ignore=ignore_unsafe)
     exclude = Path(temporary) / "exclude.txt"
-    exclude.write_text(
-        r"(^|/)\.git(/|$)\n"
-        r"(^|/)quality/analysis(/|$)\n"
-        r"(^|/)quality/Local_Scans/reports(/|$)\n"
-        r"(^|/)quality/Local_Scans/tools(/|$)" "\n"
-        r"(^|/)target(/|$)" "\n"
-        r"(^|/)node_modules(/|$)" "\n"
-        r"(^|/)\.venv(/|$)" "\n"
-        r"(^|/)__pycache__(/|$)" "\n"
-        r"(^|/)dist(/|$)" "\n"
-        r"(^|/)build(/|$)" "\n",
-        encoding="utf-8",
-    )
+    patterns = [
+        r"(^|/)\.git(/|$)",
+        r"(^|/)quality/analysis(/|$)",
+        r"(^|/)quality/Local_Scans/reports(/|$)",
+        r"(^|/)quality/Local_Scans/tools(/|$)",
+        r"(^|/)target(/|$)",
+        r"(^|/)node_modules(/|$)",
+        r"(^|/)\.venv(/|$)",
+        r"(^|/)__pycache__(/|$)",
+        r"(^|/)dist(/|$)",
+        r"(^|/)build(/|$)",
+    ]
+    exclude.write_text("\n".join(patterns) + "\n", encoding="utf-8")
 
     return staging, exclude
 
@@ -66,7 +66,7 @@ def run(repo_root, work_dir):
     output.unlink(missing_ok=True)
 
     try:
-        with TemporaryDirectory(prefix="epms-trufflehog-") as temporary:
+        with TemporaryDirectory(prefix="quality-trufflehog-") as temporary:
             # Docker filesystem scanning must never traverse Git object storage.
             # The scanner's exclude-paths option is not a reliable way to
             # exclude .git from a filesystem walk, so stage a filtered copy.
@@ -79,10 +79,10 @@ def run(repo_root, work_dir):
             command = [
                 docker, "run", "--rm",
                 "-v", f"{staging}:/repo:ro",
-                "-v", f"{exclude}:/run/epms-exclude.txt:ro",
+                "-v", f"{exclude}:/run/quality-exclude.txt:ro",
                 IMAGE,
                 "filesystem", "/repo",
-                "--exclude-paths", "/run/epms-exclude.txt",
+                "--exclude-paths", "/run/quality-exclude.txt",
                 "--json",
                 "--no-verification",
             ]

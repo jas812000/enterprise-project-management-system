@@ -1,5 +1,5 @@
 """
-Constants for the EPMS Local Quality Gate HTML report.
+Constants for the Local Quality Gate HTML report.
 """
 
 from quality.shared.reporting import report_styles

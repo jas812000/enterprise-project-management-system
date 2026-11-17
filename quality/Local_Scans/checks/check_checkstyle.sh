@@ -26,7 +26,7 @@ REPO_ROOT="$1"
 WORK_DIR="$2"
 TOOLS_DIR="$3"
 
-JAVA_SRC="${REPO_ROOT}/backend/src/main/java"
+JAVA_SRC="${QUALITY_JAVA_SOURCE:-${REPO_ROOT}/backend/src/main/java}"
 CHECKSTYLE_CONFIG="${REPO_ROOT}/quality/Local_Scans/config/checkstyle.xml"
 
 CHECKSTYLE_VERSION="14.4.0"

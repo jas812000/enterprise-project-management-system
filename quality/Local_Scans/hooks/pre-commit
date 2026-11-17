@@ -16,15 +16,15 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 CHECK_SCRIPT="${REPO_ROOT}/quality/Local_Scans/run-local-checks.sh"
 
 if [ ! -f "${CHECK_SCRIPT}" ]; then
-  echo "WARNING: EPMS quality gate runner not found." >&2
+  echo "WARNING: Quality gate runner not found." >&2
   echo "Expected: ${CHECK_SCRIPT}" >&2
   exit 0
 fi
 
-echo "Running EPMS advisory local quality checks..."
+echo "Running advisory local quality checks..."
 
 if sh "${CHECK_SCRIPT}"; then
-  echo "EPMS local quality checks completed successfully."
+  echo "Local quality checks completed successfully."
 else
   STATUS=$?
   echo "WARNING: Local quality checks returned exit code ${STATUS}." >&2

@@ -1,5 +1,5 @@
 """
-Tool section renderers for the EPMS Quality Gate HTML report.
+Tool section renderers for the CI Quality Gate HTML report.
 
 Functions
 ---------

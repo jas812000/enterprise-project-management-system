@@ -1,4 +1,4 @@
-# EPMS Local Quality Gate (BN1)
+# Local Quality Gate (BN1)
 
 ## 1. Overview
 

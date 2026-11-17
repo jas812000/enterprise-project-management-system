@@ -1,5 +1,5 @@
 """
-EPMS CI scanner execution-status handling.
+CI scanner execution-status handling.
 
 Combines scanner execution status with normalized parser results.
 
