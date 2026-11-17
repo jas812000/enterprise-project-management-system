@@ -56,3 +56,6 @@ __pycache__/
 
 # Local quality gate test fixtures
 /quality/fixtures/
+
+# Local Python scanner environment
+/.venv/

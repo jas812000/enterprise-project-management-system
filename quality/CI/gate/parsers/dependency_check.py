@@ -94,9 +94,9 @@ Step 3
     because it prevents the NVD database from being updated.
 """
 
-import json
 from pathlib import Path
 
+from quality.shared.artifact_io import load_json_with_error, prepare_artifact, record_findings
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -130,13 +130,7 @@ def _load_dependency_check_data(artifact: Path, result: dict) -> dict | None:
     dict | None
         Parsed JSON document, or None on failure.
     """
-    try:
-        with open(artifact, "r", encoding="utf-8") as file_handle:
-            return json.load(file_handle)
-    except (OSError, TypeError, ValueError, KeyError) as error:
-        result["runtime_error"] = True
-        result["metadata"]["error"] = f"Dependency-Check parse error: {error}"
-        return None
+    return load_json_with_error(artifact, result, "Dependency-Check")
 
 
 def _get_package_id(dependency: dict) -> str:
@@ -332,13 +326,8 @@ def parse_dependency_check(raw_dir: Path) -> dict:
     result = base_tool_result("dependency_check")
     artifact = raw_dir / "dependency-check-report.json"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
 
     data = _load_dependency_check_data(artifact, result)
     if data is None:
@@ -347,8 +336,8 @@ def parse_dependency_check(raw_dir: Path) -> dict:
     dependencies = data.get("dependencies", [])
     findings = _collect_dependency_findings(dependencies, result)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    record_findings(
+        result, findings, determine_max_severity(result["severity_counts"])
+    )
 
     return result

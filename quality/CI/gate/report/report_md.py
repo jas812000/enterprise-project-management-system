@@ -14,6 +14,8 @@ build_markdown_report(evaluated_doc, env) -> str
 
 from datetime import datetime, timezone
 
+from quality.shared.reporting.result_summary import summary_fields
+
 from quality.CI.gate.report.report_constants import (
     CATEGORY_MAP,
     _MD_TABLE_HEADER,
@@ -57,12 +59,7 @@ def _summary_row(result: dict) -> str:
     tool = str(result.get("tool", "unknown"))
     category = CATEGORY_MAP.get(tool, "Analysis")
 
-    violation = result.get("policy_violation", False)
-    blocking = result.get("blocking", False)
-    reason = result.get("reason", "")
-
-    normalized = result.get("normalized", {})
-    finding_count = normalized.get("violation_count", 0)
+    violation, blocking, reason, finding_count = summary_fields(result)
 
     findings_label = (
         f"{finding_count} finding(s)"
@@ -86,6 +83,33 @@ def _summary_row(result: dict) -> str:
         f"| {role} "
         f"| {_safe_md(findings_label)} |"
     )
+
+
+def _pull_request_lines(env: dict) -> list[str]:
+    """Build optional pull-request metadata lines."""
+    lines: list[str] = []
+    if (
+        env.get("event_name") == "pull_request"
+        and env.get("pr_number")
+    ):
+        pr_number = _safe_md(env.get("pr_number", ""))
+        actor = _safe_md(env.get("actor", "unknown"))
+        head_ref = _safe_md(env.get("head_ref", ""))
+        base_ref = _safe_md(env.get("base_ref", ""))
+
+        lines += [
+            "### Pull Request",
+            "",
+            _MD_TABLE_HEADER,
+            _MD_TABLE_SEPARATOR,
+            f"| **PR Number** | #{pr_number} |",
+            f"| **PR Author** | @{actor} |",
+            f"| **Source Branch** | `{head_ref}` |",
+            f"| **Target Branch** | `{base_ref}` |",
+            "",
+        ]
+
+    return lines
 
 
 def build_markdown_report(evaluated_doc: dict, env: dict) -> str:
@@ -175,26 +199,7 @@ def build_markdown_report(evaluated_doc: dict, env: dict) -> str:
         "",
     ]
 
-    if (
-        env.get("event_name") == "pull_request"
-        and env.get("pr_number")
-    ):
-        pr_number = _safe_md(env.get("pr_number", ""))
-        actor = _safe_md(env.get("actor", "unknown"))
-        head_ref = _safe_md(env.get("head_ref", ""))
-        base_ref = _safe_md(env.get("base_ref", ""))
-
-        lines += [
-            "### Pull Request",
-            "",
-            _MD_TABLE_HEADER,
-            _MD_TABLE_SEPARATOR,
-            f"| **PR Number** | #{pr_number} |",
-            f"| **PR Author** | @{actor} |",
-            f"| **Source Branch** | `{head_ref}` |",
-            f"| **Target Branch** | `{base_ref}` |",
-            "",
-        ]
+    lines.extend(_pull_request_lines(env))
 
     lines += [
         "### Commit Details",

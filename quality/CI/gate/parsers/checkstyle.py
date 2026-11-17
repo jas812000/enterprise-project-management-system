@@ -48,11 +48,18 @@ Checkstyle XML Structure
 </checkstyle>
 """
 
-from defusedxml import ElementTree as ET
-from typing import Any as XmlElement
-from defusedxml.common import DefusedXmlException
-from pathlib import Path
 
+from pathlib import Path
+from typing import Any as XmlElement
+
+
+from quality.shared.artifact_io import (
+    iter_xml_files,
+    finish_findings,
+    append_finding,
+    load_xml_with_error,
+    prepare_artifact,
+)
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -84,13 +91,7 @@ def _load_checkstyle_root(artifact: Path, result: dict) -> XmlElement | None:
     XmlElement | None
         Parsed XML root element, or None on failure.
     """
-    try:
-        tree = ET.parse(artifact)
-        return tree.getroot()
-    except (ET.ParseError, DefusedXmlException, OSError, TypeError, ValueError, KeyError) as error:
-        result["runtime_error"] = True
-        result["metadata"]["error"] = f"Checkstyle parse error: {error}"
-        return None
+    return load_xml_with_error(artifact, result, "Checkstyle")
 
 
 def _to_int(value: str) -> int:
@@ -173,13 +174,8 @@ def parse_checkstyle(raw_dir: Path) -> dict:
     result = base_tool_result("checkstyle")
     artifact = raw_dir / "checkstyle.xml"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
 
     root = _load_checkstyle_root(artifact, result)
     if root is None:
@@ -187,19 +183,15 @@ def parse_checkstyle(raw_dir: Path) -> dict:
 
     findings: list[dict] = []
 
-    for file_node in root.findall("file"):
-        file_path = file_node.attrib.get("name", "unknown")
+    for file_path, file_node in iter_xml_files(root):
 
         for error_node in file_node.findall("error"):
             finding, normalized_severity = _build_checkstyle_finding(
                 file_path,
                 error_node,
             )
-            result["severity_counts"][normalized_severity] += 1
-            findings.append(finding)
+            append_finding(result, findings, finding, normalized_severity)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    finish_findings(result, findings, determine_max_severity)
 
     return result

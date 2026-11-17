@@ -46,6 +46,7 @@ HTMLHint JSON Structure
 import json
 from pathlib import Path
 
+from quality.shared.artifact_io import finish_findings, append_finding, prepare_artifact
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
 
@@ -167,13 +168,8 @@ def parse_htmlhint(raw_dir: Path) -> dict:
     result = base_tool_result("htmlhint")
     artifact = raw_dir / "htmlhint.json"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
 
     file_results = _load_htmlhint_data(artifact, result)
     if result["runtime_error"]:
@@ -187,11 +183,8 @@ def parse_htmlhint(raw_dir: Path) -> dict:
 
         for message in messages:
             finding, normalized_severity = _build_htmlhint_finding(file_path, message)
-            result["severity_counts"][normalized_severity] += 1
-            findings.append(finding)
+            append_finding(result, findings, finding, normalized_severity)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    finish_findings(result, findings, determine_max_severity)
 
     return result

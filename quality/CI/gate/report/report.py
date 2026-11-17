@@ -89,8 +89,8 @@ def generate_report() -> None:
     try:
         with open(EVALUATED_FILE, "r", encoding="utf-8") as file_handle:
             evaluated_doc = json.load(file_handle)
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"[report] Failed to parse evaluated.json: {e}")
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"[report] Failed to parse evaluated.json: {error}")
         sys.exit(1)
 
     REPORT_MD_FILE.parent.mkdir(parents=True, exist_ok=True)

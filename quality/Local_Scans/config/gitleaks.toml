@@ -1,0 +1,27 @@
+
+title = "EPMS Local Gitleaks Configuration"
+
+# Preserve the default Gitleaks detection rules.
+[extend]
+useDefault = true
+
+# Exclude generated artifacts, not application source code.
+[allowlist]
+description = "Exclude generated build and quality-gate artifacts"
+
+paths = [
+    '''(^|/)quality/Local_Scans/reports(/|$)''',
+    '''(^|/)quality/Local_Scans/tools(/|$)''',
+    '''(^|/)quality/analysis(/|$)''',
+    '''(^|/)\.git(/|$)''',
+
+    # Maven-generated build and test output
+    '''(^|/)target(/|$)''',
+
+    # Other generated dependency/build directories
+    '''(^|/)node_modules(/|$)''',
+    '''(^|/)\.venv(/|$)''',
+    '''(^|/)__pycache__(/|$)''',
+    '''(^|/)dist(/|$)''',
+    '''(^|/)build(/|$)''',
+]

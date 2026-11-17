@@ -75,35 +75,8 @@ def tool_findings_html(
     return "<p><em>No findings detected.</em></p>"
 
 
-def tool_section(
-    result: dict,
-    commit_url: str = "",
-) -> str:
-    """Render a full tool detail section."""
-
-    tool_raw = str(result.get("tool", "unknown"))
-    tool = escape(tool_raw, quote=True)
-
-    category = escape(
-        str(CATEGORY_MAP.get(tool_raw, "Analysis")),
-        quote=True,
-    )
-    violation = result.get("policy_violation", False)
-    blocking = result.get("blocking", False)
-    reason = result.get("reason", "")
-    normalized = result.get("normalized", {})
-    findings = normalized.get("findings", [])
-    severity_counts = normalized.get("severity_counts", {})
-
-    status_html, header_color = tool_status(reason, violation)
-    role_html = tool_role(blocking)
-    reason_html = tool_reason_html(reason)
-    findings_html = tool_findings_html(
-        findings,
-        reason,
-        normalized,
-        commit_url,
-    )
+def _scanner_errors_html(tool_raw: str, normalized: dict) -> str:
+    """Render sanitized Semgrep scanner diagnostics."""
     # Display structured Semgrep scanner errors separately
     # from code findings.
     scanner_errors_html = ""
@@ -138,7 +111,11 @@ def tool_section(
                 line_value = error.get("line", 0)
                 error_line = escape(
                     str(line_value)
-                    if type(line_value) is int and line_value > 0
+                    if (
+                        isinstance(line_value, int)
+                        and not isinstance(line_value, bool)
+                        and line_value > 0
+                    )
                     else "Not provided",
                     quote=True,
                 )
@@ -166,7 +143,57 @@ def tool_section(
                 </table>
                 """
 
-    back_link = '<a href="#tool-results-summary" style="font-size:0.8em;color:#2980b9;text-decoration:none;">↑ Back to summary</a>'
+    return scanner_errors_html
+
+
+def _tool_display_data(result: dict, commit_url: str) -> dict:
+    """Prepare escaped tool metadata and findings for rendering."""
+    tool_raw = str(result.get("tool", "unknown"))
+    normalized = result.get("normalized", {})
+    reason = result.get("reason", "")
+    status_html, header_color = tool_status(
+        reason, result.get("policy_violation", False)
+    )
+    return {
+        "tool_raw": tool_raw,
+        "tool": escape(tool_raw, quote=True),
+        "category": escape(str(CATEGORY_MAP.get(tool_raw, "Analysis")), quote=True),
+        "severity_counts": normalized.get("severity_counts", {}),
+        "status_html": status_html,
+        "header_color": header_color,
+        "role_html": tool_role(result.get("blocking", False)),
+        "reason_html": tool_reason_html(reason),
+        "findings_html": tool_findings_html(
+            normalized.get("findings", []), reason, normalized, commit_url
+        ),
+        "normalized": normalized,
+    }
+
+
+def tool_section(
+    result: dict,
+    commit_url: str = "",
+) -> str:
+    """Render a full tool detail section."""
+
+    display = _tool_display_data(result, commit_url)
+    tool_raw = display["tool_raw"]
+    tool = display["tool"]
+    category = display["category"]
+    severity_counts = display["severity_counts"]
+    status_html = display["status_html"]
+    header_color = display["header_color"]
+    role_html = display["role_html"]
+    reason_html = display["reason_html"]
+    findings_html = display["findings_html"]
+    normalized = display["normalized"]
+    scanner_errors_html = _scanner_errors_html(tool_raw, normalized)
+
+    back_link = (
+        '<a href="#tool-results-summary" '
+        'style="font-size:0.8em;color:#2980b9;text-decoration:none;">'
+        '↑ Back to summary</a>'
+    )
 
     return f"""
     <div class="tool-section" id="tool-{tool}" data-tool="{tool}">

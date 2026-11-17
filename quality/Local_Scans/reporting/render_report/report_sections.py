@@ -1,31 +1,82 @@
-"""
-Tool section and summary table builders for the EPMS Local Quality Gate report.
-"""
 
-from .report_constants import CATEGORY_MAP, TOOL_CHECKSTYLE, TOOL_PMD, TOOL_SPOTBUGS
-from .report_constants import TOOL_ID_CHECKSTYLE, TOOL_ID_PMD, TOOL_ID_SPOTBUGS
-from .report_badges import status_html, border_color, sev_pills
+"""Build nine-scanner sections for the EPMS advisory report."""
+
+from html import escape
+from quality.shared.reporting.report_controls import summary_table_head
+
+from .report_badges import border_color, sev_pills, status_html
 from .report_rows import finding_row, summary_row
 
 
+TOOL_NAMES = {
+    "trufflehog": "TruffleHog",
+    "gitleaks": "Gitleaks",
+    "checkstyle": "Checkstyle",
+    "pmd": "PMD",
+    "spotbugs": "SpotBugs",
+    "pylint": "Pylint",
+    "bandit": "Bandit",
+    "htmlhint": "HTMLHint",
+    "stylelint": "Stylelint",
+}
+
+
+def _scanner_status(result: dict) -> str:
+    """Translate CI execution results into local display statuses."""
+    if result.get("runtime_error"):
+        return "error"
+
+    metadata = result.get("metadata", {})
+    if metadata.get("status") == "disabled":
+        return "skipped"
+
+    if not result.get("executed"):
+        return "error"
+
+    if result.get("violation_count", 0):
+        return "failed"
+
+    return "passed"
+
+
+def _scanner_rows(context: dict) -> list:
+    """Return scanner details from the CI-normalized document."""
+    normalized = context.get("normalized")
+
+    if not isinstance(normalized, dict):
+        return []
+
+    results = normalized.get("results", [])
+
+    if not isinstance(results, list):
+        return []
+
+    return [
+        result
+        for result in results
+        if isinstance(result, dict)
+        and result.get("tool") in TOOL_NAMES
+    ]
+
+
 def _finding_rows(findings: list, status: str) -> str:
-    """Render finding rows with a message appropriate to scanner status."""
+    """Render findings or a scanner-status explanation."""
     if findings:
-        return "".join(finding_row(f) for f in findings)
+        return "".join(finding_row(item) for item in findings)
 
     messages = {
         "passed": "No findings.",
-        "failed": "Scanner reported violations, but no findings are available.",
-        "error": "Scanner could not complete successfully. Findings are unavailable.",
-        "skipped": "Scanner was not executed. No findings are available.",
+        "failed": "Findings were reported but details are unavailable.",
+        "error": "Scanner execution failed. Findings are unavailable.",
+        "skipped": "Scanner was disabled or not executed.",
     }
 
-    message = messages.get(
-        status,
-        "Unknown scanner status. Findings are unavailable.",
-    )
+    message = messages.get(status, "Scanner status unavailable.")
 
-    return f'<tr><td colspan="5" style="color:#7f8c8d;">{message}</td></tr>'
+    return (
+        '<tr><td colspan="5" style="color:#7f8c8d;">'
+        f"{escape(message)}</td></tr>"
+    )
 
 
 def tool_section(
@@ -35,24 +86,31 @@ def tool_section(
     findings: list,
     severity_counts: dict,
 ) -> str:
-    """Build one complete tool section."""
-    category = CATEGORY_MAP.get(tool_name, "Analysis")
+    """Render a complete advisory scanner section."""
+    tool_id = escape(tool_id, quote=True)
+    tool_name = escape(tool_name)
+
     return f"""
-<div class="tool-section" id="tool-{tool_id}" data-tool="{tool_id}"
+<div class="tool-section" id="tool-{tool_id}"
+     data-tool="{tool_id}"
      style="border-left:4px solid {border_color(status)};">
     <div class="tool-header">
         <div class="tool-title">
             <span class="tool-name">{tool_name}</span>
-            <span class="tool-category">{category}</span>
-            <a class="back-link" href="#tool-results-summary">↑ Back to summary</a>
+            <span class="tool-category">Static / Security Analysis</span>
+            <a class="back-link" href="#tool-results-summary">
+                ↑ Back to summary
+            </a>
         </div>
         <div class="tool-meta">
             {status_html(status)}
             <span style="margin-left:12px;">
-                Role: <span style="color:#c0392b;">Enforced</span>
+                Role: Advisory
             </span>
         </div>
-        <div class="sev-counts">{sev_pills(severity_counts)}</div>
+        <div class="sev-counts">
+            {sev_pills(severity_counts)}
+        </div>
     </div>
     <div class="tool-findings">
         <div class="no-results" style="display:none;">
@@ -72,48 +130,64 @@ def tool_section(
                 {_finding_rows(findings, status)}
             </tbody>
         </table>
-        <a class="back-link" href="#tool-results-summary"
-           style="display:inline-block;margin-top:8px;">↑ Back to summary</a>
+        <a class="back-link" href="#tool-results-summary">
+            ↑ Back to summary
+        </a>
     </div>
 </div>"""
 
 
 def build_summary_table(context: dict) -> str:
-    """Render the Tool Results Summary table with toggles."""
-    rows = (
-        summary_row(TOOL_ID_CHECKSTYLE, TOOL_CHECKSTYLE,
-                    context["cs_status"], context["cs_findings"])
-        + summary_row(TOOL_ID_PMD, TOOL_PMD,
-                      context["pmd_status"], context["pmd_findings"])
-        + summary_row(TOOL_ID_SPOTBUGS, TOOL_SPOTBUGS,
-                      context["sb_status"], context["sb_findings"])
-    )
+    """Render the nine-scanner summary table."""
+    rows = []
+
+    for result in _scanner_rows(context):
+        tool_id = result["tool"]
+        status = _scanner_status(result)
+        findings = result.get("findings", [])
+
+        rows.append(
+            summary_row(
+                tool_id,
+                TOOL_NAMES[tool_id],
+                status,
+                findings,
+            )
+        )
+
+    if not rows:
+        rows.append(
+            '<tr><td colspan="6">'
+            'Normalized scanner results are unavailable.'
+            '</td></tr>'
+        )
+
     return f"""
 <table>
     <thead>
-        <tr>
-            <th class="print-hide">Show</th>
-            <th>Tool</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Role</th>
-            <th>Findings</th>
-        </tr>
+{summary_table_head('<th class="print-hide">Show</th>')}
     </thead>
     <tbody>
-        {rows}
+        {''.join(rows)}
     </tbody>
 </table>"""
 
 
 def build_sections(context: dict) -> str:
-    """Render all three Java scanner sections."""
-    sections = [
-        tool_section(TOOL_ID_CHECKSTYLE, TOOL_CHECKSTYLE,
-                     context["cs_status"], context["cs_findings"], context["cs_sev"]),
-        tool_section(TOOL_ID_PMD, TOOL_PMD,
-                     context["pmd_status"], context["pmd_findings"], context["pmd_sev"]),
-        tool_section(TOOL_ID_SPOTBUGS, TOOL_SPOTBUGS,
-                     context["sb_status"], context["sb_findings"], context["sb_sev"]),
-    ]
+    """Render all nine normalized scanner sections."""
+    sections = []
+
+    for result in _scanner_rows(context):
+        tool_id = result["tool"]
+
+        sections.append(
+            tool_section(
+                tool_id,
+                TOOL_NAMES[tool_id],
+                _scanner_status(result),
+                result.get("findings", []),
+                result.get("severity_counts", {}),
+            )
+        )
+
     return "\n".join(sections)

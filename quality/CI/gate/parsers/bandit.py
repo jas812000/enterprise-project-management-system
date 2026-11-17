@@ -55,8 +55,13 @@ Bandit JSON Structure
 }
 """
 
-import json
 from pathlib import Path
+
+from quality.shared.artifact_io import (
+    prepare_artifact,
+    read_json_artifact,
+    record_findings,
+)
 
 from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.schemas import base_tool_result
@@ -95,17 +100,11 @@ def parse_bandit(raw_dir: Path) -> dict:
     result = base_tool_result("bandit")
     artifact = raw_dir / "bandit.json"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
 
-    result["artifact_present"] = True
-    result["executed"] = True
-
     try:
-        with open(artifact, "r", encoding="utf-8") as file_handle:
-            data = json.load(file_handle)
+        data = read_json_artifact(artifact)
 
         raw_findings = data.get("results", [])
         findings = []
@@ -129,9 +128,9 @@ def parse_bandit(raw_dir: Path) -> dict:
                 }
             )
 
-        result["findings"] = findings
-        result["violation_count"] = len(findings)
-        result["max_severity"] = determine_max_severity(result["severity_counts"])
+        record_findings(
+            result, findings, determine_max_severity(result["severity_counts"])
+        )
 
     except (OSError, TypeError, ValueError, KeyError) as error:
         result["runtime_error"] = True

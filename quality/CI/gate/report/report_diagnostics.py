@@ -26,6 +26,8 @@ Behavior
 from copy import deepcopy
 import re
 
+from quality.shared.severity import TRUFFLEHOG_DETECTORS
+
 from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.report.report_constants import CATEGORY_MAP
 
@@ -39,13 +41,7 @@ SAFE_SECRET_RULES = frozenset({
     "gitleaks",
 
     # TruffleHog
-    "Github",
-    "Gitlab",
-    "AWS",
-    "Slack",
-    "Stripe",
-    "Postgres",
-    "PrivateKey",
+    *TRUFFLEHOG_DETECTORS,
     "TruffleHog",
 })
 
@@ -135,6 +131,18 @@ _SEMGREP_GUIDANCE = {
 
 
 
+def _valid_semgrep_error_type(value: object) -> bool:
+    """Check the full Semgrep error category validation contract."""
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= 64
+        and value.isascii()
+        and re.fullmatch(r"[A-Za-z0-9_ -]+", value)
+        and not _SENSITIVE_PATH_PART.search(value)
+        and not re.search(r"[A-Za-z0-9]{24,}", value)
+    )
+
+
 def _safe_semgrep_error_type(value: object) -> str:
     """
     Validate a Semgrep scanner error category.
@@ -149,14 +157,7 @@ def _safe_semgrep_error_type(value: object) -> str:
     str
         Validated error category or "unknown".
     """
-    if (
-        isinstance(value, str)
-        and 1 <= len(value) <= 64
-        and value.isascii()
-        and re.fullmatch(r"[A-Za-z0-9_ -]+", value)
-        and not _SENSITIVE_PATH_PART.search(value)
-        and not re.search(r"[A-Za-z0-9]{24,}", value)
-    ):
+    if _valid_semgrep_error_type(value):
         return value
 
     return "unknown"
@@ -241,37 +242,118 @@ def _safe_policy_reason(value: object) -> str:
 
 # Diagnostic messages must be curated, not arbitrary scanner-controlled text.
 # A scanner message can contain source snippets or credentials, so do not
-# interpolate it into published HTML. The raw ZIP retains full evidence.
+# interpolate it into published HTML. Raw reports remain local and must not
+# be included in distributable ZIP archives.
+
 _PYLINT_GUIDANCE = {
-    "import-error": "Python module import failed. Check package structure, PYTHONPATH, and installed dependencies; inspect raw/pylint.json for the exact module.",
-    "missing-function-docstring": "Add a docstring explaining the function's purpose, parameters, and return value.",
-    "missing-class-docstring": "Add a class docstring explaining its purpose and responsibilities.",
-    "duplicate-code": "Pylint found repeated code in multiple modules. Inspect raw/pylint.json for the matching files and line ranges; extract a shared helper if appropriate.",
-    "wrong-import-order": "Reorder imports into standard-library, third-party, and first-party groups as required by Pylint.",
-    "ungrouped-imports": "Group imports from the same package together.",
-    "import-outside-toplevel": "Move this import to module scope unless deferred importing is intentional (for example, to avoid a cycle).",
-    "unidiomatic-typecheck": "Prefer isinstance(value, ExpectedType) to type(value) comparisons, unless exact-type semantics are required.",
-    "unused-import": "An imported module or name is not used. Remove the unused import or use it where intended.",
-    "unused-argument": "A function parameter is unused. Remove it when compatible with the API, or document why it is required.",
-    "unused-variable": "A local variable is assigned but never used. Remove it or use the intended result.",
-    "too-many-locals": "This function has too many local variables. Extract cohesive helper functions or simplify intermediate state.",
-    "too-many-return-statements": "Consider simplifying the function's control flow or extracting helper functions to reduce return branches.",
-    "too-many-branches": "Reduce branching complexity by extracting smaller functions or simplifying conditions.",
-    "too-many-boolean-expressions": "Simplify the conditional expression, for example by extracting a named predicate.",
-    "too-many-public-methods": "This class exposes many public methods. Consider separating unrelated responsibilities.",
-    "broad-exception-caught": "Catch specific exception types rather than a broad Exception where possible.",
-    "consider-using-with": "Use a context manager (with statement) to ensure resources are released correctly.",
-    "invalid-name": "Rename the identifier to follow the project's Pylint naming conventions, if compatibility permits.",
-    "redefined-outer-name": "A local name shadows a name in an outer scope. Rename or remove the conflicting binding.",
-    "reimported": "The module or symbol is imported more than once. Remove the redundant import.",
-    "bad-indentation": "Correct indentation to match the surrounding Python block.",
-    "line-too-long": "Wrap this line to meet the configured maximum line length.",
-    "missing-final-newline": "Add a newline at the end of the file.",
+    "import-error": (
+        "Python module import failed. Check package structure, "
+        "PYTHONPATH, and installed dependencies; inspect raw/pylint.json "
+        "for the exact module."
+    ),
+    "missing-function-docstring": (
+        "Add a docstring explaining the function's purpose, "
+        "parameters, and return value."
+    ),
+    "missing-class-docstring": (
+        "Add a class docstring explaining its purpose and responsibilities."
+    ),
+    "duplicate-code": (
+        "Pylint found repeated code in multiple modules. "
+        "Inspect raw/pylint.json for the matching files and line ranges; "
+        "extract a shared helper if appropriate."
+    ),
+    "wrong-import-order": (
+        "Reorder imports into standard-library, third-party, "
+        "and first-party groups as required by Pylint."
+    ),
+    "ungrouped-imports": (
+        "Group imports from the same package together."
+    ),
+    "import-outside-toplevel": (
+        "Move this import to module scope unless deferred importing "
+        "is intentional (for example, to avoid a cycle)."
+    ),
+    "unidiomatic-typecheck": (
+        "Prefer isinstance(value, ExpectedType) to type(value) "
+        "comparisons, unless exact-type semantics are required."
+    ),
+    "unused-import": (
+        "An imported module or name is not used. "
+        "Remove the unused import or use it where intended."
+    ),
+    "unused-argument": (
+        "A function parameter is unused. Remove it when compatible "
+        "with the API, or document why it is required."
+    ),
+    "unused-variable": (
+        "A local variable is assigned but never used. "
+        "Remove it or use the intended result."
+    ),
+    "too-many-locals": (
+        "This function has too many local variables. "
+        "Extract cohesive helper functions or simplify intermediate state."
+    ),
+    "too-many-return-statements": (
+        "Consider simplifying the function's control flow or "
+        "extracting helper functions to reduce return branches."
+    ),
+    "too-many-branches": (
+        "Reduce branching complexity by extracting smaller "
+        "functions or simplifying conditions."
+    ),
+    "too-many-boolean-expressions": (
+        "Simplify the conditional expression, for example "
+        "by extracting a named predicate."
+    ),
+    "too-many-public-methods": (
+        "This class exposes many public methods. "
+        "Consider separating unrelated responsibilities."
+    ),
+    "broad-exception-caught": (
+        "Catch specific exception types rather than "
+        "a broad Exception where possible."
+    ),
+    "consider-using-with": (
+        "Use a context manager (with statement) to ensure "
+        "resources are released correctly."
+    ),
+    "invalid-name": (
+        "Rename the identifier to follow the project's "
+        "Pylint naming conventions, if compatibility permits."
+    ),
+    "redefined-outer-name": (
+        "A local name shadows a name in an outer scope. "
+        "Rename or remove the conflicting binding."
+    ),
+    "reimported": (
+        "The module or symbol is imported more than once. "
+        "Remove the redundant import."
+    ),
+    "bad-indentation": (
+        "Correct indentation to match the surrounding Python block."
+    ),
+    "line-too-long": (
+        "Wrap this line to meet the configured maximum line length."
+    ),
+    "missing-final-newline": (
+        "Add a newline at the end of the file."
+    ),
 }
+
 _BANDIT_GUIDANCE = {
-    "B405": "Potentially unsafe xml.etree.ElementTree import. Verify untrusted XML is parsed using defusedxml; remove unnecessary standard-library XML imports when possible.",
-    "B105": "Possible hardcoded credential. Replace real secrets with environment or secret-manager values; for synthetic tests, construct safe fixtures without embedding credential-like literals.",
+    "B405": (
+        "Potentially unsafe xml.etree.ElementTree import. "
+        "Verify untrusted XML is parsed using defusedxml; "
+        "remove unnecessary standard-library XML imports when possible."
+    ),
+    "B105": (
+        "Possible hardcoded credential. Replace real secrets with "
+        "environment or secret-manager values; for synthetic tests, "
+        "construct safe fixtures without embedding credential-like literals."
+    ),
 }
+
 
 
 def _analysis_guidance(tool: str, rule: object) -> str:
@@ -281,15 +363,20 @@ def _analysis_guidance(tool: str, rule: object) -> str:
     if tool == "pylint":
         return _PYLINT_GUIDANCE.get(
             rule,
-            "An imported module or name is not used. Remove the unused import or use it where intended.",
+            "An imported module or name is not used. "
+            "Remove the unused import or use it where intended.",
         )
     if tool == "bandit":
         return _BANDIT_GUIDANCE.get(
             rule,
-            "Inspect the Bandit rule and raw/bandit.json; apply the recommended secure coding practice after checking the actual code path.",
+            "Inspect the Bandit rule and raw/bandit.json; apply the recommended "
+            "secure coding practice after checking the actual code path.",
         )
     if tool == "semgrep":
-        return "Review the flagged security pattern, affected code, and Semgrep rule guidance."
+        return (
+            "Review the flagged security pattern, affected code, "
+            "and Semgrep rule guidance."
+        )
     return "Inspect the scanner rule and corresponding raw artifact for the specific issue."
 
 
@@ -311,7 +398,7 @@ def _safe_finding_severity(value: object) -> str:
 
 def _safe_finding_line(value: object) -> int:
     """Return a valid positive line number or zero when unavailable."""
-    if type(value) is int and 1 <= value <= 10_000_000:
+    if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 10_000_000:
         return value
     return 0
 
@@ -325,14 +412,14 @@ def _safe_severity_counts(value: object) -> dict:
         level: count
         for level, count in value.items()
         if level in SAFE_SEVERITIES
-        and type(count) is int
+        and isinstance(count, int) and not isinstance(count, bool)
         and 0 <= count <= 10_000_000
     }
 
 
 def _safe_violation_count(value: object) -> int:
     """Return a safe nonnegative finding count."""
-    if type(value) is int and 0 <= value <= 10_000_000:
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10_000_000:
         return value
 
     return 0

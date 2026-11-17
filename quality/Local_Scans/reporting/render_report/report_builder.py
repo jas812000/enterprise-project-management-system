@@ -9,35 +9,28 @@ from .report_sections import build_summary_table, build_sections
 
 
 def _build_banner(context: dict) -> tuple[str, str]:
-    """Return banner color and text based on required scanner results."""
-    statuses = (
-        context["cs_status"],
-        context["pmd_status"],
-        context["sb_status"],
-    )
+    """Describe scan results without implying enforcement."""
+    normalized = context.get("normalized")
 
-    if "error" in statuses or any(
-        status not in ("passed", "failed", "error", "skipped")
-        for status in statuses
-    ):
-        return (
-            "#8e44ad",
-            "ERROR — One or more required scanners could not complete successfully.",
-        )
+    if normalized is not None:
+        errors = normalized.get("scanner_errors", 0)
+        findings = normalized.get("total_violations", 0)
 
-    if "skipped" in statuses:
-        return (
-            "#8e44ad",
-            "INCOMPLETE — One or more required scanners were skipped.",
-        )
+        if errors:
+            return (
+                "#8e44ad",
+                "ADVISORY — Some scanners could not complete.",
+            )
 
-    if "failed" in statuses or context["failed"]:
-        return (
-            "#c0392b",
-            "FAILED — One or more required quality checks detected violations.",
-        )
+        if findings:
+            return (
+                "#c0392b",
+                "ADVISORY — Quality or security findings detected.",
+            )
 
-    return "#27ae60", "APPROVED — All required checks passed."
+        return "#27ae60", "ADVISORY — No findings detected."
+
+    return "#8e44ad", "ADVISORY — Scan results are incomplete."
 
 
 def build_html(context: dict) -> str:
@@ -93,7 +86,7 @@ def build_html(context: dict) -> str:
 <h2 id="tool-results-summary">Tool Results Summary</h2>
 {summary_table}
 
-<div class="section-header">Enforced Tools</div>
+<div class="section-header">Advisory Tools</div>
 {sections_html}
 
 <footer>

@@ -47,7 +47,7 @@ def summary_row(tool_id: str, tool_name: str, status: str, findings: list) -> st
         f'<td><a class="tool-link" href="#tool-{tool_id}">{tool_name}</a></td>'
         f"<td>{category}</td>"
         f"<td>{status_html(status)}</td>"
-        f'<td><span style="color:#c0392b;">Enforced</span></td>'
+        f"<td>Advisory</td>"
         f"<td>{count}</td>"
         "</tr>"
     )

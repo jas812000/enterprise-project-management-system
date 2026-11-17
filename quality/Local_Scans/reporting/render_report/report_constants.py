@@ -2,13 +2,10 @@
 Constants for the EPMS Local Quality Gate HTML report.
 """
 
-SEVERITY_COLORS = {
-    "critical": "#7c0000",
-    "high":     "#c0392b",
-    "medium":   "#e67e22",
-    "low":      "#f1c40f",
-    "info":     "#3498db",
-}
+from quality.shared.reporting import report_styles
+
+
+SEVERITY_COLORS = report_styles.SEVERITY_COLORS
 
 CATEGORY_MAP = {
     "Checkstyle": "SAST — Java",

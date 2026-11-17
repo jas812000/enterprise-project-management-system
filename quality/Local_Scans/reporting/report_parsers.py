@@ -17,10 +17,11 @@ Each finding dictionary contains:
   message  — human-readable description
 """
 
-from defusedxml import ElementTree as ET
-from typing import Any as XmlElement
-from defusedxml.common import DefusedXmlException
 from pathlib import Path
+from typing import Any as XmlElement
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 
 def _strip_root(path: str, repo_root: str) -> str:
@@ -64,17 +65,17 @@ def parse_checkstyle(path: Path, repo_root: str) -> tuple[list, dict]:
     try:
         tree = ET.parse(str(path))
         root = tree.getroot()
-        ns = _strip_namespace(root)
+        namespace = _strip_namespace(root)
 
-        if root.tag != f"{ns}checkstyle":
+        if root.tag != f"{namespace}checkstyle":
             raise RuntimeError(
                 f"Invalid Checkstyle report '{path}': "
                 f"expected <checkstyle> root, found {root.tag!r}"
             )
 
-        for file_el in root.findall(f"{ns}file"):
+        for file_el in root.findall(f"{namespace}file"):
             fname = _strip_root(file_el.get("name", "unknown"), repo_root)
-            for err in file_el.findall(f"{ns}error"):
+            for err in file_el.findall(f"{namespace}error"):
                 native = (err.get("severity") or "info").lower()
                 sev = {"error": "high", "warning": "medium", "info": "low"}.get(
                     native, "low"
@@ -122,17 +123,17 @@ def parse_pmd(path: Path, repo_root: str) -> tuple[list, dict]:
     try:
         tree = ET.parse(str(path))
         root = tree.getroot()
-        ns = _strip_namespace(root)
+        namespace = _strip_namespace(root)
 
-        if root.tag != f"{ns}pmd":
+        if root.tag != f"{namespace}pmd":
             raise RuntimeError(
                 f"Invalid PMD report '{path}': "
                 f"expected <pmd> root, found {root.tag!r}"
             )
 
-        for file_el in root.findall(f"{ns}file"):
+        for file_el in root.findall(f"{namespace}file"):
             fname = _strip_root(file_el.get("name", "unknown"), repo_root)
-            for violation in file_el.findall(f"{ns}violation"):
+            for violation in file_el.findall(f"{namespace}violation"):
                 priority = int(violation.get("priority", "3"))
                 sev = priority_map.get(priority, "medium")
                 sev_counts[sev] += 1
@@ -173,19 +174,19 @@ def parse_spotbugs(path: Path) -> tuple[list, dict]:
     try:
         tree = ET.parse(str(path))
         root = tree.getroot()
-        ns = _strip_namespace(root)
+        namespace = _strip_namespace(root)
 
-        if root.tag != f"{ns}BugCollection":
+        if root.tag != f"{namespace}BugCollection":
             raise RuntimeError(
                 f"Invalid SpotBugs report '{path}': "
                 f"expected <BugCollection> root, found {root.tag!r}"
             )
 
-        for bug in root.findall(f"{ns}BugInstance"):
+        for bug in root.findall(f"{namespace}BugInstance"):
             priority = int(bug.get("priority", "2"))
             sev = priority_map.get(priority, "medium")
             sev_counts[sev] += 1
-            src = bug.find(f"{ns}SourceLine")
+            src = bug.find(f"{namespace}SourceLine")
             file_path = (
                 src.get("sourcepath", "unknown") if src is not None else "unknown"
             )
@@ -196,7 +197,7 @@ def parse_spotbugs(path: Path) -> tuple[list, dict]:
                     "file": file_path,
                     "line": line,
                     "rule": bug.get("type", "unknown"),
-                    "message": (bug.findtext(f"{ns}ShortMessage") or "").strip(),
+                    "message": (bug.findtext(f"{namespace}ShortMessage") or "").strip(),
                 }
             )
     except (OSError, ET.ParseError, DefusedXmlException, ValueError) as error:
@@ -208,16 +209,12 @@ def parse_spotbugs(path: Path) -> tuple[list, dict]:
 
 
 def empty_severity_counts():
-    return {
-        "critical": 0,
-        "high": 0,
-        "medium": 0,
-        "low": 0,
-        "info": 0,
-    }
+    """Return zero counts for each normalized severity."""
+    return dict.fromkeys(("critical", "high", "medium", "low", "info"), 0)
 
 
 def parse_scanner_report(status, parser, path, *args):
+    """Parse a completed scan or return empty results for inactive scans."""
     if status in ("error", "skipped"):
         return [], empty_severity_counts()
 

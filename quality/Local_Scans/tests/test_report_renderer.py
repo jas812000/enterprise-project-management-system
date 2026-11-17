@@ -1,6 +1,7 @@
 """Regression tests for EPMS HTML quality-gate rendering."""
 
 import unittest
+from quality.Local_Scans.reporting.report_parsers import empty_severity_counts
 
 from quality.Local_Scans.reporting.render_report.report_badges import (
     border_color,
@@ -20,15 +21,10 @@ from quality.Local_Scans.reporting.render_report.report_sections import (
 class TestReportRenderer(unittest.TestCase):
     """Verify scanner status rendering and overall gate precedence."""
 
-    SEVERITY = {
-        "critical": 0,
-        "high": 0,
-        "medium": 0,
-        "low": 0,
-        "info": 0,
-    }
+    SEVERITY = empty_severity_counts()
 
     def test_status_badges(self):
+        """Verify status badges."""
         cases = {
             "passed": ("PASSED", "#27ae60"),
             "failed": ("FAILED", "#c0392b"),
@@ -45,6 +41,7 @@ class TestReportRenderer(unittest.TestCase):
                 self.assertEqual(border_color(status), color)
 
     def test_summary_rows(self):
+        """Verify summary rows."""
         cases = [
             ("checkstyle", "Checkstyle", "passed", 0),
             ("pmd", "PMD", "failed", 3),
@@ -62,6 +59,7 @@ class TestReportRenderer(unittest.TestCase):
                 self.assertIn(f"<td>{count}</td>", html)
 
     def test_error_and_skipped_summary_counts(self):
+        """Verify error and skipped summary counts."""
         for status in ("error", "skipped"):
             with self.subTest(status=status):
                 html = summary_row(
@@ -72,6 +70,7 @@ class TestReportRenderer(unittest.TestCase):
                 self.assertIn("<td>&mdash;</td>", html)
 
     def test_detailed_sections(self):
+        """Verify detailed sections."""
         cases = [
             ("checkstyle", "Checkstyle", "passed", "#27ae60"),
             ("pmd", "PMD", "failed", "#c0392b"),
@@ -92,14 +91,12 @@ class TestReportRenderer(unittest.TestCase):
                 )
 
     def test_empty_finding_messages(self):
+        """Verify empty finding messages."""
         cases = {
             "passed": "No findings.",
-            "failed": (
-                "Scanner reported violations, "
-                "but no findings are available."
-            ),
-            "error": "Scanner could not complete successfully.",
-            "skipped": "Scanner was not executed.",
+            "failed": "Findings were reported but details are unavailable.",
+            "error": "Scanner execution failed.",
+            "skipped": "Scanner was disabled or not executed.",
         }
 
         for status, message in cases.items():
@@ -115,31 +112,31 @@ class TestReportRenderer(unittest.TestCase):
                 self.assertIn(message, html)
 
     def test_banner_precedence(self):
+        """Verify advisory banner behavior."""
         cases = [
-            ("passed", "passed", "passed", 0, "APPROVED"),
-            ("passed", "failed", "passed", 1, "FAILED"),
-            ("passed", "error", "passed", 0, "ERROR"),
-            ("passed", "skipped", "passed", 0, "INCOMPLETE"),
-            ("failed", "skipped", "passed", 1, "INCOMPLETE"),
-            ("error", "failed", "passed", 1, "ERROR"),
-            ("error", "skipped", "passed", 0, "ERROR"),
+            (0, 0, "No findings detected"),
+            (3, 0, "findings detected"),
+            (0, 1, "could not complete"),
+            (3, 1, "could not complete"),
         ]
 
-        for cs, pmd, sb, failed, expected in cases:
+        for findings, errors, expected in cases:
             with self.subTest(
-                checkstyle=cs, pmd=pmd, spotbugs=sb
+                findings=findings,
+                errors=errors,
             ):
                 context = {
-                    "cs_status": cs,
-                    "pmd_status": pmd,
-                    "sb_status": sb,
-                    "failed": failed,
+                    "normalized": {
+                        "total_violations": findings,
+                        "scanner_errors": errors,
+                    },
                 }
 
                 _, message = _build_banner(context)
-                actual = message.split(" — ", 1)[0]
 
-                self.assertEqual(actual, expected)
+                self.assertIn("ADVISORY", message)
+                self.assertIn(expected, message)
+
 
 
 if __name__ == "__main__":

@@ -67,8 +67,13 @@ Semgrep JSON Structure
 }
 """
 
-import json
 from pathlib import Path
+from quality.shared.artifact_io import (
+    finish_findings,
+    append_finding,
+    load_json_with_error,
+    prepare_artifact,
+)
 from quality.CI.gate.parsers.path_safety import safe_finding_path
 from quality.CI.gate.schemas import base_tool_result
 from quality.CI.gate.utils import determine_max_severity
@@ -102,13 +107,7 @@ def _load_semgrep_data(artifact: Path, result: dict) -> dict | None:
     dict | None
         Parsed JSON document or None on failure.
     """
-    try:
-        with open(artifact, "r", encoding="utf-8") as file_handle:
-            return json.load(file_handle)
-    except (OSError, TypeError, ValueError, KeyError) as error:
-        result["runtime_error"] = True
-        result["metadata"]["error"] = f"Semgrep parse error: {error}"
-        return None
+    return load_json_with_error(artifact, result, "Semgrep")
 
 
 def _normalize_to_list(value: list | str | None) -> list:
@@ -201,44 +200,8 @@ def _build_semgrep_finding(raw_finding: dict) -> tuple[dict, str]:
 # Main parser
 # ----------------------------------------------------------
 
-def parse_semgrep(raw_dir: Path) -> dict:
-    """
-    Parse Semgrep JSON and return a standardized result dictionary.
-
-    Parameters
-    ----------
-    raw_dir : Path
-        Directory containing raw tool output artifacts.
-
-    Returns
-    -------
-    dict
-        Result dictionary conforming to the base_tool_result schema,
-        including findings, severity counts, and max_severity.
-
-    Contract
-    --------
-    - Always returns a base_tool_result structure.
-    - Never raises exceptions outward.
-    - Missing artifact sets artifact_present=False and runtime_error=True.
-    - Malformed JSON sets runtime_error=True and records the error in metadata.
-    - Empty results are treated as a valid execution with zero violations.
-    """
-    result = base_tool_result("semgrep")
-    artifact = raw_dir / "semgrep.json"
-
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
-        return result
-
-    result["artifact_present"] = True
-    result["executed"] = True
-
-    data = _load_semgrep_data(artifact, result)
-    if data is None:
-        return result
-
+def _collect_scanner_errors(data: dict, result: dict) -> None:
+    """Retain only safe structured Semgrep execution diagnostics."""
     # Semgrep's raw messages can include source excerpts or credentials.
     # Publish validated identifiers, locations and curated troubleshooting
     # guidance instead. Keep raw messages only in the private scan artifact.
@@ -274,7 +237,7 @@ def parse_semgrep(raw_dir: Path) -> dict:
                 start = {}
 
             line = start.get("line", 0)
-            if type(line) is not int or not 1 <= line <= 10_000_000:
+            if not isinstance(line, int) or isinstance(line, bool) or not 1 <= line <= 10_000_000:
                 line = 0
 
             safe_errors.append({
@@ -288,16 +251,49 @@ def parse_semgrep(raw_dir: Path) -> dict:
             f"Semgrep reported {len(raw_errors)} scanner execution error(s)."
         )
 
+
+def parse_semgrep(raw_dir: Path) -> dict:
+    """
+    Parse Semgrep JSON and return a standardized result dictionary.
+
+    Parameters
+    ----------
+    raw_dir : Path
+        Directory containing raw tool output artifacts.
+
+    Returns
+    -------
+    dict
+        Result dictionary conforming to the base_tool_result schema,
+        including findings, severity counts, and max_severity.
+
+    Contract
+    --------
+    - Always returns a base_tool_result structure.
+    - Never raises exceptions outward.
+    - Missing artifact sets artifact_present=False and runtime_error=True.
+    - Malformed JSON sets runtime_error=True and records the error in metadata.
+    - Empty results are treated as a valid execution with zero violations.
+    """
+    result = base_tool_result("semgrep")
+    artifact = raw_dir / "semgrep.json"
+
+    if not prepare_artifact(result, artifact):
+        return result
+
+    data = _load_semgrep_data(artifact, result)
+    if data is None:
+        return result
+
+    _collect_scanner_errors(data, result)
+
     raw_findings = data.get("results", [])
     findings: list[dict] = []
 
     for raw_finding in raw_findings:
         finding, normalized_severity = _build_semgrep_finding(raw_finding)
-        result["severity_counts"][normalized_severity] += 1
-        findings.append(finding)
+        append_finding(result, findings, finding, normalized_severity)
 
-    result["findings"] = findings
-    result["violation_count"] = len(findings)
-    result["max_severity"] = determine_max_severity(result["severity_counts"])
+    finish_findings(result, findings, determine_max_severity)
 
     return result

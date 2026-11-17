@@ -67,6 +67,9 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quality.shared.scanner_status import scanner_is_disabled
+from quality.shared.severity import aggregate_severity_counts
+
 from quality.CI.gate.parsers.bandit           import parse_bandit
 from quality.CI.gate.parsers.checkstyle       import parse_checkstyle
 from quality.CI.gate.parsers.dependency_check import parse_dependency_check
@@ -106,52 +109,16 @@ TOOL_PARSERS: list[tuple[str, callable]] = [
 ]
 
 
-def normalize() -> list[dict]:
-    """
-    Run all registered tool parsers and write normalized.json.
-
-    Each parser reads its raw artifact from RAW_DIR and returns a
-    standardized result dictionary conforming to schemas.base_tool_result.
-
-    A top-level summary wrapper is written around all tool results so the
-    policy engine and reporting layer have a single entry point for overall
-    pipeline state.
-
-    Returns
-    -------
-    list[dict]
-        The list of per-tool normalized result dictionaries.
-
-    Contract
-    --------
-    - Always attempts to run every registered parser.
-    - Never aborts due to a single tool failure.
-    - Converts parser exceptions into runtime_error records.
-    - Creates the output directory if it does not already exist.
-    """
-    NORMALIZED_DIR.mkdir(parents=True, exist_ok=True)
-
+def _normalize_tools() -> list[dict]:
+    """Normalize every registered scanner without losing failure isolation."""
     results: list[dict] = []
-
     for tool_name, parser in TOOL_PARSERS:
         try:
             status_file = RAW_DIR / f"{tool_name}.status.json"
 
             # Explicitly disabled scanners do not require raw reports.
             # Only a valid status object with a nonempty reason qualifies.
-            disabled = False
-
-            if status_file.is_file():
-                try:
-                    status_data = json.loads(
-                        status_file.read_text(encoding="utf-8")
-                    )
-                    disabled = (
-                        isinstance(status_data, dict)
-                        and status_data.get("status") == "disabled"
-                    )
-                except (OSError, ValueError, UnicodeError):
-                    disabled = False
+            disabled = scanner_is_disabled(status_file)
 
             if disabled:
                 result = base_tool_result(tool_name)
@@ -179,7 +146,7 @@ def normalize() -> list[dict]:
             results.append(result)
 
         # Preserve scanner isolation and report unexpected failures.
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:  # pylint: disable=broad-except
             error_result = base_tool_result(tool_name)
             error_result["executed"] = False
             error_result["runtime_error"] = True
@@ -189,13 +156,39 @@ def normalize() -> list[dict]:
             )
             results.append(error_result)
 
+    return results
+
+
+def normalize() -> list[dict]:
+    """
+    Run all registered tool parsers and write normalized.json.
+
+    Each parser reads its raw artifact from RAW_DIR and returns a
+    standardized result dictionary conforming to schemas.base_tool_result.
+
+    A top-level summary wrapper is written around all tool results so the
+    policy engine and reporting layer have a single entry point for overall
+    pipeline state.
+
+    Returns
+    -------
+    list[dict]
+        The list of per-tool normalized result dictionaries.
+
+    Contract
+    --------
+    - Always attempts to run every registered parser.
+    - Never aborts due to a single tool failure.
+    - Converts parser exceptions into runtime_error records.
+    - Creates the output directory if it does not already exist.
+    """
+    NORMALIZED_DIR.mkdir(parents=True, exist_ok=True)
+
+    results = _normalize_tools()
+
     total_violations = sum(result.get("violation_count", 0) for result in results)
 
-    combined_severity_counts: dict[str, int] = dict.fromkeys(SEVERITY_ORDER, 0)
-    for result in results:
-        for level, count in result.get("severity_counts", {}).items():
-            if level in combined_severity_counts:
-                combined_severity_counts[level] += count
+    combined_severity_counts = aggregate_severity_counts(results, SEVERITY_ORDER)
 
     overall_max_severity = determine_max_severity(combined_severity_counts)
     generated_at         = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
