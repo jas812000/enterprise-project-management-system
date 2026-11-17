@@ -1,4 +1,4 @@
-# Local Quality Gate (BN1)
+# EPMS Local Quality Gate (BN1)
 
 ## 1. Overview
 
@@ -12,7 +12,7 @@ The local quality gate uses three scanners:
 
 The quality gate generates an HTML report and a timestamped ZIP archive containing the analysis results.
 
-When configured as a Git pre-commit hook, BN1 blocks normal commits if any required scanner fails or encounters an execution error.
+When configured as a Git pre-commit hook, BN1 reports scanner findings and execution errors but does not block commits.
 
 The quality gate can also be executed manually without creating a commit.
 
@@ -58,7 +58,7 @@ Downloaded scanner binaries must not be committed to the repository.
 
 On a new development machine, the required scanner distributions must be installed or obtained according to the requirements of the individual scanner wrappers.
 
-The installation process will be documented more precisely after fresh-environment reproducibility testing.
+Setup guidance is provided in `quality/PORTABILITY.md`; fresh-environment reproducibility testing remains outstanding.
 
 ---
 
@@ -108,6 +108,17 @@ quality/
 The `reports/` and `tools/` directories are excluded from version control.
 
 ---
+
+## Current scanner inventory and project configuration
+
+Configure `quality/project.json` using `quality/project.example.json`. The Java wrappers require a compatible JDK and Maven project; Python 3.10+ and Git are required. Start Docker Desktop/Engine before running TruffleHog. If Docker cannot start its container, TruffleHog can report exit code 125 as an execution error rather than a finding.
+
+| Scanner | EPMS result (2026-11-17) |
+|---|---|
+| Checkstyle, PMD, SpotBugs | Clean |
+| Pylint, Bandit | Clean |
+| Gitleaks, TruffleHog | Clean |
+| HTMLHint, Stylelint | Disabled: no applicable source |
 
 ## 4. Running the Local Quality Gate
 
@@ -239,7 +250,7 @@ The main quality-gate runner returns:
 | `1` | One or more scanners reported quality violations |
 | `2` | One or more scanner execution errors occurred |
 
-The pre-commit hook blocks commits when the runner returns a nonzero exit code.
+The pre-commit hook is advisory and permits commits even when the scanner runner reports errors; inspect the report rather than relying on the commit exit status.
 
 Scanner execution errors are distinguished from legitimate quality violations so that environmental problems are not incorrectly reported as code defects.
 
@@ -406,28 +417,19 @@ The hook must be executable for Git to invoke it.
 
 ---
 
-## 10. Relationship to the CI Quality Gate (BN2)
+## 10. Relationship to the CI Quality Gate
 
-BN1 provides local static analysis before commits.
+BN1 is local and advisory; it does not block commits. The CI Quality Gate runs on GitHub Actions and evaluates scanner results using `quality/CI/gate/policy.yaml`.
 
-BN2 is the planned CI quality gate, intended to execute through GitHub Actions.
-
-| Capability | BN1 — Local | BN2 — CI |
+| Capability | BN1 — Local | CI Quality Gate |
 |---|---|---|
-| Environment | Developer workstation | GitHub Actions |
-| Execution | Manual or pre-commit | Planned automated workflow |
-| Checkstyle | Implemented | Planned |
-| PMD | Implemented | Planned |
-| SpotBugs | Implemented | Planned |
-| HTML report | Implemented | To be determined |
-| ZIP report | Implemented | To be determined |
-| Enforcement | Blocks normal commits when configured | Planned CI enforcement |
-| Negative-test fixture | Available | Intended for reuse |
-| Status | Implemented and locally tested | Not yet implemented |
+| Execution | Manual or pre-commit | PRs and pushes to `main` |
+| Scanners | 9 registered; 7 applicable to EPMS | 12 registered |
+| Reports | HTML and timestamped ZIP | Markdown, HTML, analysis artifact |
+| Enforcement | Advisory | Policy-driven; required checks depend on GitHub rulesets |
+| Verification | 2026-11-17 local run | GitHub Actions runs #19 and #20 succeeded |
 
-BN2 should reuse the established quality policies and shared test fixtures where appropriate.
-
----
+See `quality/CI/gate/README.md` for technical contracts and CI reporting.
 
 ## 11. Verified Results
 
@@ -437,7 +439,7 @@ The following tests have been completed during BN1 development:
 
 A deliberately defective Java class was used to verify scanner detection.
 
-All three scanners detected violations, demonstrating that the quality gate rejects defective code.
+All three Java scanners detected violations in this historical negative test; the current BN1 hook is advisory and does not reject commits.
 
 ### 11.2 Clean Static Analysis
 
@@ -473,7 +475,7 @@ Results:
 - ZIP report generated.
 - Hook exit status: `0`.
 
-No Git commit was created during this verification.
+No Git commit was created during that earlier direct-hook test; a later Git-triggered commit was verified on 2026-11-17.
 
 ---
 
@@ -485,17 +487,13 @@ The following enhancements are deferred:
 2. Automate isolated negative-test execution using the shared fixture.
 3. Verify the Windows batch launcher on a Windows development machine.
 4. Establish reproducible scanner installation for fresh development environments.
-5. Integrate the quality policies into the planned BN2 GitHub Actions workflow.
+5. Maintain alignment between BN1 reporting and the implemented CI Quality Gate.
 6. Verify Git's automatic pre-commit invocation during an approved commit.
 
 ---
 
 ## 13. Current Status
 
-**BN1 — Local Quality Gate: Implemented and locally verified.**
+BN1 is implemented and advisory. On 2026-11-17 seven scanners (Checkstyle, PMD, SpotBugs, Pylint, Bandit, Gitleaks, TruffleHog) completed cleanly, HTMLHint and Stylelint were disabled, and there were zero findings and zero scanner errors.
 
-The quality gate successfully executes Checkstyle, PMD, and SpotBugs, generates consolidated reports, and returns appropriate success or failure statuses.
-
-The Git pre-commit hook has been configured and tested directly.
-
-Remaining work includes documentation finalization, fresh-environment verification, and validation of Git-triggered execution during an actual commit.
+The hook ran during Git commit `40760b9`. The earlier three-scanner and Java test results in section 11 are historical development checks, not the current complete scanner inventory. Fresh-environment and cross-project portability remain to be verified.

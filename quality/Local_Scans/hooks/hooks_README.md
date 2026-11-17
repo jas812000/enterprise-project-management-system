@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The `hooks/` directory contains Git hooks used to integrate the Local Quality Gate (BN1) into the development workflow.
+The `hooks/` directory contains Git hooks used to integrate the EPMS Local Quality Gate (BN1) into the development workflow.
 
 The pre-commit hook automatically executes the local quality checks before Git creates a commit.
 
@@ -142,41 +142,28 @@ This skips the configured local pre-commit hook.
 
 It should be reserved for exceptional circumstances and should not be part of the normal development workflow.
 
-**Important:** The BN2 CI Quality Gate is not yet implemented. Therefore, bypassing BN1 currently bypasses the project's implemented automated commit-time quality enforcement.
+**Important:** The CI Quality Gate is implemented separately in GitHub Actions. Bypassing BN1 skips local checks, but does not skip CI.
 
-## 9. Relationship to BN2
+## 9. Relationship to the CI Quality Gate
 
-BN1 and BN2 serve different purposes.
+BN1 runs advisory local checks before commits. The CI Quality Gate is implemented in GitHub Actions, with policy-driven evaluation and successful PR/main workflow runs #19 and #20. Required checks depend on GitHub branch protection/rulesets.
 
-| Quality Gate | Purpose | Status |
-|---|---|---|
-| BN1 — Local Quality Gate | Runs static analysis locally and before commits | Implemented |
-| BN2 — CI Quality Gate | Runs automated checks during GitHub pull-request validation | Planned |
-
-BN2 is intended to provide repository-level validation independent of each developer's local Git hook configuration.
-
-Until BN2 is implemented, the local pre-commit hook remains the primary automated quality gate.
+The pre-commit hook does not block commits, even when scanner findings or execution errors are reported.
 
 ## 10. Verified Behavior
 
-The pre-commit hook has been configured and directly executed successfully on macOS.
-
-The direct hook test confirmed that:
-
-- Checkstyle passed.
-- PMD passed.
-- SpotBugs passed.
-- The overall quality gate returned exit code `0`.
-
-An actual Git-triggered commit test remains pending until the BN1 changes are approved for committing.
+The hook ran during actual Git commit `40760b9` on 2026-11-17: seven scanners clean, two disabled, zero findings and zero errors. A later commit proceeded despite a TruffleHog Docker execution error, consistent with advisory behavior. After starting Docker, the full BN1 run completed cleanly.
 
 ## 11. Current Status
 
-The BN1 pre-commit hook is implemented and locally verified.
+The BN1 hook is implemented and verified in real Git commits. It is advisory, not blocking. Cross-platform and fresh-environment verification remain outstanding.
 
-Remaining work includes:
+To install from the repository root:
 
-1. Final repository-content review.
-2. Verification during an approved Git commit.
-3. Implementation of BN2 GitHub Actions integration.
-4. Additional cross-platform verification.
+```bash
+git config --local core.hooksPath quality/Local_Scans/hooks
+chmod +x quality/Local_Scans/hooks/pre-commit
+git config --show-origin --get core.hooksPath
+```
+
+Start Docker before running the gate.

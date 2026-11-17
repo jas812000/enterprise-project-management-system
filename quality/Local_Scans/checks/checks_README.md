@@ -2,11 +2,23 @@
 
 ## 1. Overview
 
-The `checks/` directory contains the scanner execution scripts used by the Local Quality Gate (BN1).
+The `checks/` directory contains the scanner execution scripts used by the EPMS Local Quality Gate (BN1).
 
 Each script executes one static analysis tool against the Java backend, generates machine-readable results, and returns a standardized exit code.
 
-The main quality-gate runner coordinates all three scanners.
+The main quality-gate runner coordinates all applicable scanners. This section originally described the three Java wrappers.
+
+## Current scanner inventory
+
+The BN1 runner registers Checkstyle, PMD, SpotBugs, Pylint, Bandit, Gitleaks, TruffleHog, HTMLHint, and Stylelint. Seven were clean for EPMS on 2026-11-17; HTMLHint and Stylelint were disabled because no applicable source was configured.
+
+Configure repository-relative paths in `quality/project.json` and run from the repository root:
+
+```bash
+bash quality/Local_Scans/run-local-checks.sh
+```
+
+Docker must be running for containerized TruffleHog. An execution error is not a clean scan. The pre-commit hook is advisory. See `quality/PORTABILITY.md`.
 
 ## 2. Static Analysis Tools
 
@@ -119,11 +131,6 @@ An automated isolated negative-test workflow is planned.
 
 ## 9. Current Status
 
-All three scanners have been tested successfully on macOS.
+The original Java wrapper and negative-test details above remain technical reference material. The current BN1 also runs Python and secret scanners. On 2026-11-17, seven scanners completed cleanly, two were disabled, and no scanner errors occurred.
 
-The quality gate has demonstrated both:
-
-- Detection of deliberately introduced violations.
-- Successful execution with zero violations.
-
-Additional fresh-environment and cross-platform verification remains planned.
+Cross-platform and separate-project verification remain outstanding.
