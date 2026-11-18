@@ -39,9 +39,12 @@
 		<java.version>25</java.version>
 
 		<!-- Security updates for vulnerable dependencies -->
-		<tomcat.version>11.0.26</tomcat.version>
-		<jackson-bom.version>3.2.3</jackson-bom.version>
-		<logback.version>1.6.3</logback.version>
+		<tomcat.version>11.0.27</tomcat.version>
+		<jackson-bom.version>3.2.4</jackson-bom.version>
+		<logback.version>1.6.6</logback.version>
+		<hibernate-validator.version>9.1.5.Final</hibernate-validator.version>
+		<json-smart.version>2.6.1</json-smart.version>
+		<commons-codec.version>1.23.0</commons-codec.version>
 		<postgresql.version>42.7.14</postgresql.version>
 	</properties>
 
@@ -72,7 +75,7 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
-		<!-- Align Jackson annotations with Jackson BOM 3.2.3 -->
+		<!-- Explicit Jackson annotations version used with Jackson 3. -->
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-annotations</artifactId>
@@ -100,11 +103,46 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator-test</artifactId>
 			<scope>test</scope>
+			<exclusions>
+				<!-- Exclude the unmaintained, vulnerable JSON implementation. -->
+				<exclusion>
+					<groupId>com.vaadin.external.google</groupId>
+					<artifactId>android-json</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!-- Maintained JSON implementation for JSONAssert-based tests. -->
+		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20250517</version>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- PostgreSQL integration testing with isolated Docker containers. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- JUnit Jupiter integration for Testcontainers lifecycle management. -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 
