@@ -278,9 +278,9 @@ if [ "${CHECKSTYLE_EXIT}" -ne 0 ] && [ "${COUNT}" -eq 0 ]; then
 fi
 
 if [ "${COUNT}" -eq 0 ]; then
-  echo "Checkstyle passed. No violations found."
+  echo "Checkstyle passed. No findings found."
   exit 0
 else
-  echo "Checkstyle failed. ${COUNT} violation(s) found."
+  echo "Checkstyle completed. ${COUNT} findings detected."
   exit 1
 fi

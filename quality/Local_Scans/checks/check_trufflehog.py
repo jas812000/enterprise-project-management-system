@@ -105,7 +105,6 @@ def run(repo_root, work_dir):
 
         if valid:
             write_status(work, "trufflehog", "completed", 0)
-            print("TruffleHog execution: completed")
             return
 
         output.unlink(missing_ok=True)
@@ -126,7 +125,6 @@ def run(repo_root, work_dir):
             reason="Docker or TruffleHog execution unavailable",
         )
 
-    print("TruffleHog execution: error")
 
 
 if __name__ == "__main__":

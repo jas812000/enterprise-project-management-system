@@ -216,9 +216,9 @@ PY
 )" || error "Unable to validate SpotBugs XML."
 
 if [ "${COUNT}" -gt 0 ]; then
-  echo "SpotBugs failed: ${COUNT} finding(s)."
+  echo "SpotBugs completed. ${COUNT} findings detected."
   exit 1
 fi
 
-echo "SpotBugs passed: no findings."
+echo "SpotBugs passed. No findings found."
 exit 0

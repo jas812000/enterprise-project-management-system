@@ -43,7 +43,7 @@ def run(repo_root, work_dir):
             )
         )
 
-    completed = run_json_scanner(
+    run_json_scanner(
         "htmlhint",
         ["npx", "--yes", "htmlhint", *files, "--format", "json"],
         work_dir,
@@ -51,10 +51,6 @@ def run(repo_root, work_dir):
         ScannerValidation({0, 1}, valid_htmlhint),
     )
 
-    print(
-        "HTMLHint execution:",
-        "completed" if completed else "error",
-    )
 
 
 if __name__ == "__main__":

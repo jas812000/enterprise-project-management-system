@@ -69,7 +69,7 @@ def run_selected(repo_root, work_dir, scanner):
         )
 
     if scanner == "pylint":
-        completed = run_json_scanner(
+        run_json_scanner(
             "pylint",
             [
                 sys.executable,
@@ -84,13 +84,11 @@ def run_selected(repo_root, work_dir, scanner):
             ScannerValidation(set(range(32)), valid_pylint, environment),
         )
     else:
-        completed = run_json_scanner(
+        run_json_scanner(
             "bandit",
             [sys.executable, "-m", "bandit", "-f", "json", *files],
             work_dir, "bandit.json", ScannerValidation({0, 1}, valid_bandit, environment),
         )
-    print(f"{scanner.capitalize()} execution: "
-          f"{'completed' if completed else 'error'}", flush=True)
 
 
 def run_pylint(repo_root, work_dir):

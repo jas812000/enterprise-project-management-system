@@ -88,7 +88,7 @@ def run(repo_root, work_dir, tools_dir):
             )
         )
 
-    completed = run_json_scanner(
+    run_json_scanner(
         "stylelint",
         [
             str(executable),
@@ -101,10 +101,6 @@ def run(repo_root, work_dir, tools_dir):
         ScannerValidation({0, 2}, valid_report),
     )
 
-    print(
-        "Stylelint execution:",
-        "completed" if completed else "error",
-    )
 
 
 if __name__ == "__main__":
