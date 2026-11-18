@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class ResourceConflictExceptionTest {
 
@@ -22,6 +23,27 @@ class ResourceConflictExceptionTest {
 
     // Assert: Verify the message is preserved.
     assertEquals(message, exception.getMessage());
+  }
+
+  /**
+   * Verifies that the exception preserves both its descriptive
+   * message and the original cause.
+   */
+  @Test
+  void constructorShouldPreserveMessageAndCause() {
+
+    // Arrange: Define the conflict and its underlying cause.
+    String message = "Organization already exists";
+    IllegalStateException cause =
+            new IllegalStateException("Original failure");
+
+    // Act: Create the conflict exception with its cause.
+    ResourceConflictException exception =
+            new ResourceConflictException(message, cause);
+
+    // Assert: Verify both values are preserved.
+    assertEquals(message, exception.getMessage());
+    assertSame(cause, exception.getCause());
   }
 
   /**

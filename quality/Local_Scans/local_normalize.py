@@ -105,3 +105,25 @@ def summarize_local(document: dict) -> None:
     print(f"Total findings: {document['total_violations']}")
     print(f"Scanner errors: {document['scanner_errors']}")
     print("Mode: ADVISORY — findings do not block commits.")
+
+
+def format_scanner_outcome(result: dict) -> str:
+    """Format a scanner result from normalized status and finding count."""
+    name = result["tool"]
+    display = {
+        "pylint": "Pylint", "bandit": "Bandit",
+        "htmlhint": "HTMLHint", "stylelint": "Stylelint",
+        "gitleaks": "Gitleaks", "trufflehog": "TruffleHog",
+    }.get(name, name)
+    status = result.get("metadata", {}).get("status", "failed")
+    count = result.get("violation_count", 0)
+
+    if result.get("runtime_error") or status == "failed":
+        return f"{display}: error (scanner failed)."
+    if status == "disabled":
+        return f"{display}: disabled."
+    if status != "completed":
+        return f"{display}: error (unexpected scanner status)."
+    if count:
+        return f"{display} completed. {count} findings detected."
+    return f"{display} passed. No findings found."

@@ -227,7 +227,7 @@ case "${PMD_EXIT}" in
       exit 2
     fi
 
-    echo "PMD passed. No violations found."
+    echo "PMD passed. No findings found."
     exit 0
     ;;
 
@@ -237,7 +237,7 @@ case "${PMD_EXIT}" in
       exit 2
     fi
 
-    echo "PMD failed. ${VIOLATION_COUNT} violation(s) detected."
+    echo "PMD completed. ${VIOLATION_COUNT} findings detected."
     exit 1
     ;;
 esac

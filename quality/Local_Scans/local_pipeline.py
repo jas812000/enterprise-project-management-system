@@ -18,6 +18,7 @@ from quality.Local_Scans.checks.run_additional_scanners import (
 from quality.Local_Scans.local_normalize import (
     normalize_local,
     summarize_local,
+    format_scanner_outcome,
 )
 
 
@@ -89,6 +90,24 @@ def integrate(
 
         # Reuse the existing CI parsers and status validation.
         document = normalize_local(staging, normalized_file)
+
+        # Report actual normalized outcomes, not merely execution completion.
+        additional = {
+            "pylint", "bandit", "htmlhint", "stylelint",
+            "gitleaks", "trufflehog",
+        }
+        for result in document["results"]:
+            if result["tool"] in additional:
+                display_name = {
+                    "pylint": "Pylint",
+                    "bandit": "Bandit",
+                    "htmlhint": "HTMLHint",
+                    "stylelint": "Stylelint",
+                    "gitleaks": "Gitleaks",
+                    "trufflehog": "TruffleHog",
+                }[result["tool"]]
+                print(f"\n--- {display_name} ---", flush=True)
+                print(format_scanner_outcome(result), flush=True)
 
         # Retain the complete raw artifacts for local inspection.
         for artifact in staging.iterdir():

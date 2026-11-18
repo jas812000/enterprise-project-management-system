@@ -37,14 +37,12 @@ def run(repo_root, work_dir, binary="gitleaks"):
             "failed",
             reason="Gitleaks configuration file unavailable",
         )
-        print("Gitleaks execution: error")
         return
 
     # Resolve executable explicitly; never invoke a shell.
     executable = shutil.which(binary)
     if executable is None:
         write_status(work, "gitleaks", "failed", reason="Gitleaks executable unavailable")
-        print("Gitleaks execution: error")
         return
 
     command = [
@@ -108,7 +106,6 @@ def run(repo_root, work_dir, binary="gitleaks"):
                 "completed",
                 exit_code,
             )
-            print("Gitleaks execution: completed")
             return
 
         output.unlink(missing_ok=True)
@@ -131,7 +128,6 @@ def run(repo_root, work_dir, binary="gitleaks"):
             reason="Gitleaks executable unavailable",
         )
 
-    print("Gitleaks execution: error")
 
 
 if __name__ == "__main__":

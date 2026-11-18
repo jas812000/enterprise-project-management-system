@@ -16,8 +16,8 @@ def _stage_source(root: Path, temporary: str) -> tuple[Path, Path]:
     """Create a filtered scan snapshot and exclusion rules."""
     staging = Path(temporary) / "source"
     excluded_dirs = {
-        ".git", ".venv", "venv", "node_modules", "__pycache__",
-        "target", "build", "dist", ".pytest_cache",
+        ".git", ".idea", ".venv", "venv", "node_modules",
+        "__pycache__", "target", "build", "dist", ".pytest_cache",
     }
 
     def ignore_generated(directory, names):
@@ -50,6 +50,7 @@ def _stage_source(root: Path, temporary: str) -> tuple[Path, Path]:
         r"(^|/)__pycache__(/|$)",
         r"(^|/)dist(/|$)",
         r"(^|/)build(/|$)",
+        r"(^|/)\.idea(/|$)",
     ]
     exclude.write_text("\n".join(patterns) + "\n", encoding="utf-8")
 
@@ -104,7 +105,6 @@ def run(repo_root, work_dir):
 
         if valid:
             write_status(work, "trufflehog", "completed", 0)
-            print("TruffleHog execution: completed")
             return
 
         output.unlink(missing_ok=True)
@@ -125,7 +125,6 @@ def run(repo_root, work_dir):
             reason="Docker or TruffleHog execution unavailable",
         )
 
-    print("TruffleHog execution: error")
 
 
 if __name__ == "__main__":

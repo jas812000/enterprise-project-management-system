@@ -32,12 +32,6 @@ def run(repo_root: Path, raw_dir: Path, tools_dir: Path) -> None:
 
     for names, execute in groups:
         name = names[0]
-        display = {
-            "htmlhint": "HTMLHint", "gitleaks": "Gitleaks",
-            "trufflehog": "TruffleHog", "stylelint": "Stylelint",
-            "pylint": "Pylint", "bandit": "Bandit",
-        }[name]
-        print(f"\n--- {display} ---", flush=True)
         try:
             execute()
         except Exception:  # pylint: disable=broad-except
@@ -66,22 +60,7 @@ def run(repo_root: Path, raw_dir: Path, tools_dir: Path) -> None:
                     encoding="utf-8",
                 )
 
-            try:
-                status = json.loads(
-                    status_file.read_text(encoding="utf-8")
-                ).get("status", "failed")
-            except (OSError, ValueError):
-                status = "failed"
 
-            display_name = {
-                "pylint": "Pylint",
-                "bandit": "Bandit",
-                "htmlhint": "HTMLHint",
-                "stylelint": "Stylelint",
-                "gitleaks": "Gitleaks",
-                "trufflehog": "TruffleHog",
-            }[name]
-            print(f"{display_name}: {status}", flush=True)
 
 
 if __name__ == "__main__":
