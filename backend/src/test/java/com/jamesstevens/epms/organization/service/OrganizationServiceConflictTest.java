@@ -61,10 +61,12 @@ class OrganizationServiceConflictTest {
                         "Concurrent creation attempt"
                 );
 
-        assertThrows(
+        ResourceConflictException thrown = assertThrows(
                 ResourceConflictException.class,
                 () -> organizationService.createOrganization(request)
         );
+
+        assertSame(dataException, thrown.getCause());
 
         verify(organizationRepository).saveAndFlush(any(Organization.class));
     }

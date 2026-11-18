@@ -17,6 +17,7 @@ import java.util.UUID;
  * method for retrieving the organization's record without
  * requiring its identifier.
  */
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface OrganizationRepository
         extends JpaRepository<Organization, UUID> {
 

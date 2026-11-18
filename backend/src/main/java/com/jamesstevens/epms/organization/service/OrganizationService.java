@@ -26,16 +26,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrganizationService {
 
-    private final OrganizationRepository organizationRepository;
+    private final OrganizationRepository repository;
 
     /**
      * Creates the service with its required repository dependency.
      *
-     * @param organizationRepository repository for organization persistence
+     * @param repository repository for organization persistence
      */
     public OrganizationService(
-            OrganizationRepository organizationRepository) {
-        this.organizationRepository = organizationRepository;
+            OrganizationRepository repository) {
+        this.repository = repository;
     }
 
     /**
@@ -53,7 +53,7 @@ public class OrganizationService {
     public OrganizationResponse createOrganization(
             CreateOrganizationRequest request) {
 
-        if (organizationRepository.findFirstBy().isPresent()) {
+        if (repository.findFirstBy().isPresent()) {
             throw new ResourceConflictException(
                     "An organization already exists for this EPMS installation."
             );
@@ -66,7 +66,7 @@ public class OrganizationService {
 
         try {
             Organization savedOrganization =
-                    organizationRepository.saveAndFlush(organization);
+                    repository.saveAndFlush(organization);
 
             return toResponse(savedOrganization);
 
@@ -74,7 +74,8 @@ public class OrganizationService {
 
             if (isSingleOrganizationConstraintViolation(exception)) {
                 throw new ResourceConflictException(
-                        "An organization already exists for this EPMS installation."
+                        "An organization already exists for this EPMS installation.",
+                        exception
                 );
             }
 
@@ -97,15 +98,16 @@ public class OrganizationService {
             DataIntegrityViolationException exception) {
 
         Throwable cause = exception;
+        boolean isViolation = false;
 
-        while (cause != null) {
+        while (cause != null && !isViolation) {
 
-            if (cause instanceof ConstraintViolationException constraintException) {
+            if (cause instanceof ConstraintViolationException constraintEx) {
 
-                String constraintName = constraintException.getConstraintName();
-                String sqlState = constraintException.getSQLState();
+                String constraintName = constraintEx.getConstraintName();
+                String sqlState = constraintEx.getSQLState();
 
-                return "23505".equals(sqlState)
+                isViolation = "23505".equals(sqlState)
                         && "ux_organizations_single_instance".equals(
                         constraintName
                 );
@@ -114,7 +116,7 @@ public class OrganizationService {
             cause = cause.getCause();
         }
 
-        return false;
+        return isViolation;
     }
 
     /**
@@ -126,7 +128,7 @@ public class OrganizationService {
     @Transactional(readOnly = true)
     public OrganizationResponse getOrganization() {
 
-        Organization organization = organizationRepository.findFirstBy()
+        Organization organization = repository.findFirstBy()
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "The organization has not been configured."
                 ));
@@ -145,7 +147,7 @@ public class OrganizationService {
     public OrganizationResponse updateOrganization(
             UpdateOrganizationRequest request) {
 
-        Organization organization = organizationRepository.findFirstBy()
+        Organization organization = repository.findFirstBy()
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "The organization has not been configured."
                 ));
@@ -155,10 +157,9 @@ public class OrganizationService {
                 request.description()
         );
 
-        Organization updatedOrganization =
-                organizationRepository.saveAndFlush(organization);
+        Organization saved = repository.saveAndFlush(organization);
 
-        return toResponse(updatedOrganization);
+        return toResponse(saved);
     }
 
     /**

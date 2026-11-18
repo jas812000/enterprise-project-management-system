@@ -22,4 +22,14 @@ public class ResourceConflictException extends RuntimeException {
     public ResourceConflictException(String message) {
         super(message);
     }
+
+    /**
+     * Creates a conflict exception while preserving its original cause.
+     *
+     * @param message description of the resource conflict
+     * @param cause underlying exception that caused the conflict
+     */
+    public ResourceConflictException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

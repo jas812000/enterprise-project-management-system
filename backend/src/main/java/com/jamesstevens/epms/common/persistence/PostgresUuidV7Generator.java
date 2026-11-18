@@ -50,7 +50,7 @@ public class PostgresUuidV7Generator implements BeforeExecutionGenerator {
         return session.doReturningWork(connection -> {
             try (PreparedStatement statement =
                          connection.prepareStatement("SELECT uuidv7()");
-                 ResultSet resultSet = statement.executeQuery()) {
+                    ResultSet resultSet = statement.executeQuery()) {
 
                 if (!resultSet.next()) {
                     throw new SQLException(
