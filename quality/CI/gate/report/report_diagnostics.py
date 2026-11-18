@@ -29,7 +29,7 @@ import re
 from quality.shared.severity import TRUFFLEHOG_DETECTORS
 
 from quality.CI.gate.parsers.path_safety import safe_finding_path
-from quality.CI.gate.report.report_constants import CATEGORY_MAP
+from quality.shared.reporting.tool_registry import CATEGORY_MAP
 
 SECRET_SCANNERS = frozenset({"gitleaks", "trufflehog"})
 REDACTION_MARKER = "***REDACTED***"

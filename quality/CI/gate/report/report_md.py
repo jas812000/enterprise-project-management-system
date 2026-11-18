@@ -15,9 +15,9 @@ build_markdown_report(evaluated_doc, env) -> str
 from datetime import datetime, timezone
 
 from quality.shared.reporting.result_summary import summary_fields
+from quality.shared.reporting.tool_registry import CATEGORY_MAP
 
 from quality.CI.gate.report.report_constants import (
-    CATEGORY_MAP,
     _MD_TABLE_HEADER,
     _MD_TABLE_SEPARATOR,
 )

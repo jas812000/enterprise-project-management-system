@@ -1,42 +1,16 @@
 """
-Shared constants for the report package.
+Shared constants for the CI Quality Gate report package.
 
-This module centralizes shared constants used by the reporting layer,
-including tool category mappings, severity color definitions, and
-common Markdown table fragments used across report generators.
+Scanner identifiers, display names, and categories are maintained
+centrally in quality.shared.reporting.tool_registry.
 """
 
 from quality.shared.reporting import report_styles
 
-_SECRETS      = "Secrets Scan"
-_SAST_JAVA    = "SAST — Java"
-_SAST_MULTI   = "SAST — Multi"
-_SAST_PYTHON  = "SAST — Python"
-_SAST_WEB     = "SAST — Web"
-_SCA_MULTI    = "SCA — Multi"
-_SCA_CONTAINER = "SCA — Container"
-_QUALITY_GATE = "Quality Gate"
-
 
 SEVERITY_COLORS = report_styles.SEVERITY_COLORS
 
-CATEGORY_MAP: dict[str, str] = {
-    "trufflehog":       _SECRETS,
-    "gitleaks":         _SECRETS,
-    "checkstyle":       _SAST_JAVA,
-    "pmd":              _SAST_JAVA,
-    "spotbugs":         _SAST_JAVA,
-    "semgrep":          _SAST_MULTI,
-    "pylint":           _SAST_PYTHON,
-    "bandit":           _SAST_PYTHON,
-    "htmlhint":         _SAST_WEB,
-    "stylelint":        _SAST_WEB,
-    "dependency_check": _SCA_MULTI,
-    "trivy":            _SCA_CONTAINER,
-}
+_QUALITY_GATE = "Quality Gate"
 
-
-
-
-_MD_TABLE_HEADER    = "| Field | Value |"
+_MD_TABLE_HEADER = "| Field | Value |"
 _MD_TABLE_SEPARATOR = "|-------|-------|"

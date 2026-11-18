@@ -10,7 +10,7 @@ tool_section(result) -> str
 """
 
 from html import escape
-from quality.CI.gate.report.report_constants import CATEGORY_MAP
+from quality.shared.reporting.tool_registry import CATEGORY_MAP
 from quality.CI.gate.report.render_report.report_badges import (
     tool_status,
     tool_role,
