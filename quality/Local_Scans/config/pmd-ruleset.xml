@@ -24,6 +24,14 @@
         <exclude name="LocalVariableCouldBeFinal"/>
         <exclude name="LocalVariableDeclarationShouldBeAtStartOfBlock"/>
         <exclude name="AtLeastOneConstructor"/>
+        <exclude name="LongVariable"/>
+    </rule>
+
+    <!-- Allow descriptive Java identifiers up to 30 characters. -->
+    <rule ref="category/java/codestyle.xml/LongVariable">
+        <properties>
+            <property name="minimum" value="31"/>
+        </properties>
     </rule>
 
 </ruleset>

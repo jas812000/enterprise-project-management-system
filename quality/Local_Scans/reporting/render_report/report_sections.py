@@ -1,24 +1,16 @@
-
 """Build nine-scanner sections for the EPMS advisory report."""
 
 from html import escape
+
 from quality.shared.reporting.report_controls import summary_table_head
+from quality.shared.reporting.tool_registry import (
+    CATEGORY_MAP,
+    LOCAL_TOOL_IDS,
+    TOOL_NAMES,
+)
 
 from .report_badges import border_color, sev_pills, status_html
 from .report_rows import finding_row, summary_row
-
-
-TOOL_NAMES = {
-    "trufflehog": "TruffleHog",
-    "gitleaks": "Gitleaks",
-    "checkstyle": "Checkstyle",
-    "pmd": "PMD",
-    "spotbugs": "SpotBugs",
-    "pylint": "Pylint",
-    "bandit": "Bandit",
-    "htmlhint": "HTMLHint",
-    "stylelint": "Stylelint",
-}
 
 
 def _scanner_status(result: dict) -> str:
@@ -55,7 +47,7 @@ def _scanner_rows(context: dict) -> list:
         result
         for result in results
         if isinstance(result, dict)
-        and result.get("tool") in TOOL_NAMES
+        and result.get("tool") in LOCAL_TOOL_IDS
     ]
 
 
@@ -87,6 +79,7 @@ def tool_section(
     severity_counts: dict,
 ) -> str:
     """Render a complete advisory scanner section."""
+    category = escape(CATEGORY_MAP.get(tool_id, "Analysis"))
     tool_id = escape(tool_id, quote=True)
     tool_name = escape(tool_name)
 
@@ -97,7 +90,7 @@ def tool_section(
     <div class="tool-header">
         <div class="tool-title">
             <span class="tool-name">{tool_name}</span>
-            <span class="tool-category">Static / Security Analysis</span>
+            <span class="tool-category">{category}</span>
             <a class="back-link" href="#tool-results-summary">
                 ↑ Back to summary
             </a>

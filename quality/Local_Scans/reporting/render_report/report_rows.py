@@ -3,7 +3,7 @@ Row renderers for the Local Quality Gate HTML report.
 """
 
 from html import escape
-from .report_constants import CATEGORY_MAP
+from quality.shared.reporting.tool_registry import CATEGORY_MAP
 from .report_badges import severity_badge, status_html
 
 
@@ -32,7 +32,7 @@ def finding_row(finding: dict) -> str:
 
 def summary_row(tool_id: str, tool_name: str, status: str, findings: list) -> str:
     """Render a summary table row with visibility toggle."""
-    category = CATEGORY_MAP.get(tool_name, "Analysis")
+    category = escape(CATEGORY_MAP.get(tool_id, "Analysis"))
     count = "&mdash;" if status in ("error", "skipped") and not findings else str(len(findings))
     toggle = (
         f'<div class="toggle-wrap">'

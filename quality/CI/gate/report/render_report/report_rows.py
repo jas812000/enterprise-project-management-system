@@ -14,7 +14,7 @@ from html import escape
 from urllib.parse import quote, urlparse, urlsplit
 
 from quality.shared.reporting.result_summary import summary_fields
-from quality.CI.gate.report.report_constants import CATEGORY_MAP
+from quality.shared.reporting.tool_registry import CATEGORY_MAP
 from quality.CI.gate.report.render_report.report_badges import (
     tool_status,
     tool_role,
