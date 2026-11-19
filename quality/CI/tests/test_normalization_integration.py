@@ -1,4 +1,4 @@
-"""Integration tests for EPMS CI scanner-status normalization."""
+"""Integration tests for CI Quality Gate scanner-status normalization."""
 
 import json
 import tempfile
@@ -19,7 +19,7 @@ def _temporary_workspace():
 
 
 class NormalizationIntegrationTests(unittest.TestCase):
-    """Regression tests for the corresponding EPMS quality component."""
+    """Regression tests for the corresponding CI Quality Gate component."""
 
     def setUp(self):
         """Set up the test fixture."""

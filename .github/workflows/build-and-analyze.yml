@@ -2,7 +2,7 @@
 # ==========================================================
 # Build and Analyze (New Gate Engine)
 # ----------------------------------------------------------
-# Quality/security workflow for EPMS.
+# Quality Gates CI quality and security workflow.
 #
 # System of record:
 #   quality/CI/gate/
@@ -380,7 +380,7 @@ jobs:
       # Output: quality/analysis/raw/checkstyle.xml
       # ------------------------------------------------------
 
-      - name: Run Checkstyle (BN1)
+      - name: Run Checkstyle
         if: success() || failure()
         shell: bash
         run: |
@@ -429,7 +429,7 @@ jobs:
       # Output: quality/analysis/raw/pmd.xml
       # ------------------------------------------------------
 
-      - name: Run PMD (BN1)
+      - name: Run PMD
         if: success() || failure()
         shell: bash
         run: |
@@ -474,14 +474,14 @@ jobs:
       # ------------------------------------------------------
       # Tool: SpotBugs (Java Bytecode Static Analysis)
       # ------------------------------------------------------
-      # Uses the existing BN1 SpotBugs scanner.
-      # The BN1 script compiles the backend using Maven,
+      # Uses the Local Quality Gate SpotBugs scanner.
+      # The scanner script compiles the configured Maven project,
       # builds its dependency classpath, and validates XML.
       #
       # Output: quality/analysis/raw/spotbugs.xml
       # ------------------------------------------------------
 
-      - name: Run SpotBugs (BN1)
+      - name: Run SpotBugs
         if: success() || failure()
         shell: bash
         run: |

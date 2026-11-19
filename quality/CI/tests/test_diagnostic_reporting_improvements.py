@@ -1,4 +1,5 @@
-"""Regression tests for EPMS diagnostic clarity and source-location safety."""
+"""Regression tests for CI diagnostic clarity and source-location safety."""
+
 import os
 import unittest
 from copy import deepcopy

@@ -1,4 +1,4 @@
-"""Tests for EPMS scanner-status-aware report parsing."""
+"""Tests for Local Quality Gate scanner-status-aware report parsing."""
 
 import unittest
 
@@ -8,7 +8,7 @@ from quality.Local_Scans.reporting.report_parsers import (
 
 
 class TestReportStatus(unittest.TestCase):
-    """Regression tests for the corresponding EPMS quality component."""
+    """Regression tests for Local Quality Gate report status handling."""
 
     def test_passed_scanner_calls_parser(self):
         """Verify passed scanner calls parser."""

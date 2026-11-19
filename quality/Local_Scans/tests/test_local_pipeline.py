@@ -1,5 +1,4 @@
-
-"""Tests for the BN1 nine-scanner integration."""
+"""Tests for Local Quality Gate scanner integration."""
 
 import json
 import unittest

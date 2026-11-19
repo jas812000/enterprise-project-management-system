@@ -1,20 +1,10 @@
 {
-  "project_name": "EPMS",
+  "project_name": "Example Project",
   "java_version": "25",
   "scan_root": ".",
   "java_source": "backend/src/main/java",
   "maven_project": "backend",
-  "python_source": "quality",
+  "python_source": "",
   "javascript_source": "",
-  "safe_jdbc_urls": [
-    {
-      "file": "backend/src/main/resources/application.properties",
-      "jdbc_parts": {
-        "scheme": "postgresql",
-        "host": "localhost",
-        "port": 5432,
-        "database": "epms"
-      }
-    }
-  ]
+  "safe_jdbc_urls": []
 }

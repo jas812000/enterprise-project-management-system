@@ -1,4 +1,4 @@
-"""Build nine-scanner sections for the EPMS advisory report."""
+"""Build nine-scanner sections for the Local Quality Gate advisory report."""
 
 from html import escape
 

@@ -3,7 +3,7 @@
 # ==========================================================
 # PMD - Local Check
 # ----------------------------------------------------------
-# Runs PMD against backend/src/main/java.
+# Runs PMD against the configured Java source directory.
 # Downloads PMD to the supplied tools directory on first run.
 #
 # Arguments:

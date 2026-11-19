@@ -1,5 +1,4 @@
-
-"""Shared severity filter choices for EPMS HTML reports."""
+"""Shared severity filter controls for Quality Gates HTML reports."""
 
 SEVERITY_OPTIONS = """
             <option value="all">All</option>

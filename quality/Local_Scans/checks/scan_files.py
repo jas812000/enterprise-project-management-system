@@ -1,5 +1,5 @@
 
-"""Shared source-file discovery for EPMS local scanners."""
+"""Shared source-file discovery for Local Quality Gate scanners."""
 
 from pathlib import Path
 
