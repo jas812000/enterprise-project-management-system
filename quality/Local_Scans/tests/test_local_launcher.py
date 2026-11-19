@@ -2,7 +2,8 @@
 
 import json
 import os
-import subprocess
+import shutil
+import subprocess  # nosec B404
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LAUNCHER = REPO_ROOT / "quality/Local_Scans/run-local-checks.sh"
+
+# Resolve the shell executable for the controlled launcher regression test.
+SHELL = shutil.which("sh")
+if SHELL is None:
+    raise RuntimeError("Required POSIX shell executable is unavailable")
 
 
 class LocalLauncherTests(unittest.TestCase):
@@ -27,8 +33,9 @@ class LocalLauncherTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["QUALITY_CONFIG"] = str(config)
 
-            result = subprocess.run(
-                ["sh", str(LAUNCHER)],
+            # Fixed executable and repository-local launcher; shell=False.
+            result = subprocess.run(  # nosec B603
+                [SHELL, str(LAUNCHER)],
                 cwd=REPO_ROOT,
                 env=environment,
                 capture_output=True,
