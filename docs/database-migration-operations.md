@@ -161,11 +161,9 @@ The Maven Flyway plugin reads three environment variables:
 | `EPMS_FLYWAY_USERNAME` | PostgreSQL migration account username |
 | `EPMS_FLYWAY_PASSWORD` | PostgreSQL migration account password |
 
-For local development, the migration URL is:
+For local development, `EPMS_FLYWAY_URL` identifies the local EPMS PostgreSQL database.
 
-```text
-jdbc:postgresql://localhost:5432/epms
-```
+The connection URL is supplied through the developer's environment configuration rather than hardcoded in the Maven plugin.
 
 The migration username must identify `epms_migrator`.
 
