@@ -1,5 +1,4 @@
-
-"""Common CSS rules used by both EPMS quality reports."""
+"""Common CSS rules used by Local and CI Quality Gates reports."""
 
 BASE_CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }

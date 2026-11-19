@@ -1,5 +1,5 @@
 
-"""Normalize EPMS local scanner results using existing CI parsers."""
+"""Normalize Local Quality Gate scanner results using existing CI parsers."""
 
 import json
 from datetime import datetime, timezone

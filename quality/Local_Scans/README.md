@@ -1,217 +1,246 @@
-# EPMS Local Quality Gate (BN1)
+# Local Quality Gate
 
 ## 1. Overview
 
-The Enterprise Project Management System (EPMS) Local Quality Gate (BN1) performs automated static analysis of the Java backend to identify coding-standard violations, maintainability issues, potential defects, and security-related problems.
+The Local Quality Gate is the advisory static-analysis and security-scanning component of the Quality Gates framework.
 
-The local quality gate uses three scanners:
+It supports local execution and optional Git pre-commit integration. It collects scanner results, normalizes findings, generates an HTML report, and packages selected reporting artifacts into a timestamped ZIP archive.
 
-1. **Checkstyle** — Checks Java source code against established coding standards.
-2. **PMD** — Detects potential programming errors, code-quality issues, and maintainability concerns.
-3. **SpotBugs** — Analyzes compiled Java bytecode for potential defects and security-related issues.
+The Local Quality Gate does not enforce quality thresholds or block Git commits. The CI Quality Gate is responsible for policy-driven enforcement.
 
-The quality gate generates an HTML report and a timestamped ZIP archive containing the analysis results.
+For instructions on integrating Quality Gates into another repository, see [Project Configuration and Portability](../PORTABILITY.md).
 
-When configured as a Git pre-commit hook, BN1 reports scanner findings and execution errors but does not block commits.
+## 2. Supported Scanners
 
-The quality gate can also be executed manually without creating a commit.
+Nine scanners are registered.
 
----
+| Scanner    | Purpose                                  |
+|------------|------------------------------------------|
+| Checkstyle | Java coding standards and style          |
+| PMD        | Java static analysis and maintainability |
+| SpotBugs   | Java bytecode defect analysis            |
+| Pylint     | Python code quality                      |
+| Bandit     | Python security analysis                 |
+| Gitleaks   | Secret detection                         |
+| TruffleHog | Secret detection through Docker          |
+| HTMLHint   | HTML validation                          |
+| Stylelint  | CSS and related stylesheet analysis      |
 
-## 2. Development Requirements
+Scanner applicability depends on the host project's source configuration and the scanner's execution requirements.
 
-The current EPMS development environment uses:
+A registered scanner is not necessarily executed successfully. Results distinguish completed scans, disabled scanners, findings, and execution errors.
 
-| Component | Version / Requirement |
-|---|---|
-| Java | Java 25 LTS |
-| Spring Boot | 4.1.1 |
-| Build System | Maven Wrapper |
-| Database | PostgreSQL 18.6 |
-| Python | 3.10 or newer |
-| Version Control | Git |
-| Operating System | macOS (verified) |
+### 2.1 Scanner Outcomes
 
-Java and Python must be available in the development environment.
+| Outcome  | Meaning                                       |
+|----------|-----------------------------------------------|
+| CLEAN    | Scanner executed without reported findings    |
+| FINDINGS | Scanner executed and reported findings        |
+| DISABLED | Scanner was not applicable or was disabled    |
+| ERROR    | Scanner execution or result processing failed |
 
-The scanner distributions must also be available in the locations expected by their corresponding execution scripts.
+A disabled scanner must not be interpreted as a successful scan.
 
-PostgreSQL is required for application integration tests but is not directly required by every static analysis scanner.
+The Local Quality Gate reports findings and errors without applying CI enforcement policy.
 
-### 2.1 Static Analysis Tools
+## 3. Prerequisites
 
-| Tool | Version | Purpose |
-|---|---|---|
-| Checkstyle | Managed by scanner wrapper | Coding standards and formatting |
-| PMD | 7.29.0 | Code quality and maintainability |
-| SpotBugs | 4.10.5 | Bytecode defect analysis |
+### 3.1 Core Requirements
 
-### 2.2 Scanner Binaries
+- Git
+- Python 3.10 or newer
+- A supported shell environment for the shell launcher
+- Required scanner dependencies for the source languages being analyzed
 
-Scanner distributions are stored in:
+The launcher searches for a compatible Python interpreter before loading project configuration.
+
+### 3.2 Java Requirements
+
+The current Java scanner wrappers are designed for Maven-based Java projects.
+
+They require:
+
+- A compatible Java Development Kit
+- Maven or an executable Maven Wrapper
+- Java source paths configured for the host repository
+- Network access for initial scanner downloads when distributions are missing
+
+Checkstyle, PMD, and SpotBugs use scanner distributions under:
 
 `quality/Local_Scans/tools/`
 
-This directory is excluded from Git.
+The wrappers can download their required distributions when needed.
 
-Downloaded scanner binaries must not be committed to the repository.
+SpotBugs compiles the configured Maven project before performing bytecode analysis.
 
-On a new development machine, the required scanner distributions must be installed or obtained according to the requirements of the individual scanner wrappers.
+Non-Maven Java projects and repositories without Java source may require additional wrapper changes or scanner-disable support.
 
-Setup guidance is provided in `quality/PORTABILITY.md`; fresh-environment reproducibility testing remains outstanding.
+### 3.3 Additional Scanner Requirements
 
----
+Depending on the configured sources and enabled scanners:
 
-## 3. Directory Structure
+- Pylint and Bandit require their Python dependencies.
+- Stylelint uses Node.js/npm for its scanner dependencies.
+- TruffleHog requires an available Docker executable and functioning Docker engine.
+- Other scanners may require additional runtime dependencies or network access.
 
-The local quality gate uses the following organization:
+Python scanner dependencies are listed in:
+
+`quality/Local_Scans/requirements-scanners.txt`
+
+Install dependencies in an appropriate Python environment. Avoid installing project-specific dependencies globally unless that is your intended development setup.
+
+### 3.4 Operating Systems
+
+The Local Quality Gate has been exercised on macOS.
+
+The shell launcher is intended for compatible Unix-like environments.
+
+A Windows batch launcher is provided and uses Git Bash, but Windows execution remains unverified.
+
+Cross-project and fresh-environment portability testing is also outstanding.
+
+## 4. Project Configuration
+
+The framework supports project-specific configuration through:
+
+`quality/project.json`
+
+A reusable template is provided at:
+
+`quality/project.example.json`
+
+Create the host project's configuration from the example and adjust it to match the actual repository structure.
+
+Example:
+
+```json
+{
+  "project_name": "Example Project",
+  "java_version": "25",
+  "scan_root": ".",
+  "java_source": "backend/src/main/java",
+  "maven_project": "backend",
+  "python_source": "",
+  "javascript_source": "",
+  "safe_jdbc_urls": []
+}
+```
+
+### 4.1 Configuration Fields
+
+| Field               | Purpose                                                                             |
+|---------------------|-------------------------------------------------------------------------------------|
+| `project_name`      | Host-project name used by framework reporting and configuration                     |
+| `java_version`      | Configured Java version                                                             |
+| `scan_root`         | Repository-relative scan scope                                                      |
+| `java_source`       | Repository-relative Java source directory                                           |
+| `maven_project`     | Repository-relative Maven project directory                                         |
+| `python_source`     | Repository-relative Python analysis directory                                       |
+| `javascript_source` | Repository-relative JavaScript/HTML/CSS discovery root                              |
+| `safe_jdbc_urls`    | Narrowly defined exceptions for supported unverified JDBC secret-detection findings |
+
+Configured paths must remain within the host repository.
+
+The project configuration loader validates supplied values and produces shell-safe configuration exports.
+
+An invalid configuration can stop the launcher before scanners execute.
+
+The example paths are illustrative. They must not be assumed to match every consuming repository.
+
+For configuration validation rules, JDBC exception details, and cross-project integration, see [PORTABILITY.md](../PORTABILITY.md).
+
+## 5. Directory Structure
+
+The Local Quality Gate uses the following primary components:
 
 ```text
 quality/
-├── fixtures/
-│   └── negative/
-│       └── SampleErrorClass.java
-│
+├── project.json
+├── project.example.json
+├── project_config.py
+├── PORTABILITY.md
+├── shared/
+├── CI/
 └── Local_Scans/
-    ├── .gitignore
     ├── README.md
-    │
-    ├── checks/
-    │   ├── check_checkstyle.sh
-    │   ├── check_pmd.sh
-    │   └── check_spotbugs.sh
-    │
-    ├── config/
-    │   ├── checkstyle.xml
-    │   └── pmd-ruleset.xml
-    │
-    ├── hooks/
-    │   └── pre-commit
-    │
-    ├── reporting/
-    │   ├── generate_report.py
-    │   ├── report_parsers.py
-    │   └── open_report.py
-    │
-    ├── reports/
-    │   └── work/
-    │       └── local-report.html
-    │
-    ├── tests/
-    │
-    ├── tools/
-    │
     ├── run-local-checks.sh
-    └── run-local-checks.bat
+    ├── run-local-checks.bat
+    ├── scanner_registry.py
+    ├── local_pipeline.py
+    ├── local_normalize.py
+    ├── requirements-scanners.txt
+    ├── checks/
+    ├── config/
+    ├── hooks/
+    ├── reporting/
+    ├── tests/
+    ├── tools/
+    └── reports/
 ```
 
-The `reports/` and `tools/` directories are excluded from version control.
+The Local Quality Gate reuses components from `quality/CI/` and shared framework utilities.
 
----
+Consequently, copying only `quality/Local_Scans/` is not a supported standalone installation method.
 
-## Current scanner inventory and project configuration
+The `tools/` and `reports/` directories contain downloaded dependencies or generated artifacts and should not be committed.
 
-Configure `quality/project.json` using `quality/project.example.json`. The Java wrappers require a compatible JDK and Maven project; Python 3.10+ and Git are required. Start Docker Desktop/Engine before running TruffleHog. If Docker cannot start its container, TruffleHog can report exit code 125 as an execution error rather than a finding.
+## 6. Running the Local Quality Gate
 
-| Scanner | EPMS result (2026-11-17) |
-|---|---|
-| Checkstyle, PMD, SpotBugs | Clean |
-| Pylint, Bandit | Clean |
-| Gitleaks, TruffleHog | Clean |
-| HTMLHint, Stylelint | Disabled: no applicable source |
+### 6.1 macOS and Linux
 
-## 4. Running the Local Quality Gate
-
-### 4.1 macOS / Linux
-
-From the EPMS repository root:
+From the host repository root:
 
 ```bash
 sh quality/Local_Scans/run-local-checks.sh
 ```
 
-Alternatively, from the `backend/` directory:
+The launcher:
 
-```bash
-sh ../quality/Local_Scans/run-local-checks.sh
-```
+1. Resolves the host repository root.
+2. Finds a compatible Python interpreter.
+3. Loads and validates available project configuration.
+4. Prepares the local report workspace.
+5. Runs Checkstyle, PMD, and SpotBugs wrappers.
+6. Runs additional scanners through the Python orchestration layer.
+7. Normalizes results using shared scanner parsers.
+8. Generates a consolidated HTML report.
+9. Creates and validates a timestamped ZIP archive.
+10. Attempts to open the HTML report.
+11. Prints the final advisory scanner summary.
 
-The runner performs the following operations:
+The scanner registry defines the nine supported scanner names.
 
-1. Verifies that Python 3.10 or newer is available.
-2. Prepares the working report directory.
-3. Executes Checkstyle.
-4. Executes PMD.
-5. Compiles the backend and executes SpotBugs.
-6. Processes the scanner results.
-7. Generates the consolidated HTML report.
-8. Packages the report artifacts into a timestamped ZIP archive.
-9. Attempts to open the HTML report in the default browser.
-10. Displays the overall quality-gate result.
+Scanner execution errors and findings are reported separately.
 
-All three scanners are executed even when an earlier scanner reports violations.
+### 6.2 Windows
 
-### 4.2 Windows
-
-A Windows batch launcher is provided:
+The Windows launcher is:
 
 ```bat
 quality\Local_Scans\run-local-checks.bat
 ```
 
-The launcher uses Git Bash to execute the shell-based quality gate.
+The batch launcher uses Git Bash to execute the shell-based workflow.
 
-**Windows support remains unverified.** The batch launcher requires additional testing, particularly its path handling and environment configuration.
+Windows compatibility has not yet been verified through a complete test run.
 
----
+## 7. Git Pre-Commit Integration
 
-## 5. Git Pre-Commit Hook
-
-### 5.1 Purpose
-
-The pre-commit hook automatically executes BN1 when a developer attempts a normal Git commit.
-
-The hook is located at:
+The advisory pre-commit hook is located at:
 
 `quality/Local_Scans/hooks/pre-commit`
 
-### 5.2 Configure the Hook
+### 7.1 Enable the Hook
 
-From anywhere within the EPMS Git repository:
+From the host repository root:
 
 ```bash
 git config --local core.hooksPath quality/Local_Scans/hooks
-```
-
-This configures Git to use the project's custom hooks directory.
-
-### 5.3 Configure Executable Permissions
-
-On macOS or Linux, from the repository root:
-
-```bash
 chmod +x quality/Local_Scans/hooks/pre-commit
 ```
 
-Alternatively, from `backend/`:
-
-```bash
-chmod +x ../quality/Local_Scans/hooks/pre-commit
-```
-
-Verify the permissions:
-
-```bash
-ls -l ../quality/Local_Scans/hooks/pre-commit
-```
-
-Expected executable permissions include:
-
-```text
--rwxr-xr-x
-```
-
-### 5.4 Verify the Git Configuration
+Verify the configuration:
 
 ```bash
 git config --show-origin --get core.hooksPath
@@ -223,151 +252,147 @@ Expected configured path:
 quality/Local_Scans/hooks
 ```
 
-### 5.5 Enforcement Behavior
+### 7.2 Hook Behavior
 
-| Condition | Result |
-|---|---|
-| All scanners pass | Hook permits the commit to proceed |
-| Checkstyle violations | Commit blocked |
-| PMD violations | Commit blocked |
-| SpotBugs findings | Commit blocked |
-| Scanner execution error | Commit blocked |
-| Required script missing | Commit blocked |
+When Git invokes the hook, it runs the Local Quality Gate.
 
-The pre-commit hook was successfully tested through direct execution on macOS.
+The hook reports scanner findings and execution problems but does not reject the commit.
 
-Git's automatic invocation during an actual commit remains to be verified.
+If the launcher returns a nonzero status, the hook prints a warning and still exits successfully.
 
----
+If the launcher script is missing, the hook also prints a warning without blocking the commit.
 
-## 6. Exit Codes
+This advisory behavior is intentional.
 
-The main quality-gate runner returns:
+### 7.3 Disable the Custom Hook Configuration
 
-| Exit Code | Meaning |
-|---|---|
-| `0` | All scanners passed |
-| `1` | One or more scanners reported quality violations |
-| `2` | One or more scanner execution errors occurred |
+If the repository uses this hook configuration and you want to restore Git's default hook lookup:
 
-The pre-commit hook is advisory and permits commits even when the scanner runner reports errors; inspect the report rather than relying on the commit exit status.
+```bash
+git config --local --unset core.hooksPath
+```
 
-Scanner execution errors are distinguished from legitimate quality violations so that environmental problems are not incorrectly reported as code defects.
+Be aware that `core.hooksPath` is a repository-level setting. Changing it can affect other custom hooks.
 
----
+## 8. Reports and Artifacts
 
-## 7. Reports and Results
+### 8.1 HTML Report
 
-### 7.1 HTML Report
-
-The consolidated HTML report is generated at:
+The consolidated HTML report is written to:
 
 `quality/Local_Scans/reports/work/local-report.html`
 
-The report provides an overview of the quality-gate results and individual scanner findings.
+The launcher attempts to open this report in the default browser.
 
-It includes:
+If automatic opening fails, open the file manually.
 
-- Overall quality-gate status.
-- Checkstyle results.
-- PMD results.
-- SpotBugs results.
-- Severity classifications.
-- Finding descriptions and source locations where available.
-- Interactive filtering controls.
+### 8.2 Normalized Results
 
-### 7.2 ZIP Archive
+The report workspace includes:
 
-A timestamped ZIP archive is generated in:
+`quality/Local_Scans/reports/work/normalized.json`
+
+The pipeline also maintains normalized scanner results under the reports directory for subsequent summary processing.
+
+Normalized results provide a consistent representation of scanner execution status and findings.
+
+### 8.3 ZIP Archive
+
+The launcher generates a timestamped archive under:
 
 `quality/Local_Scans/reports/`
 
-The filename follows this format:
+The filename follows this pattern:
 
-```text
-local-quality-report-YYYY-MM-DD-HHMMSS.zip
-```
+`local-quality-report-YYYY-MM-DD-HHMMSS.zip`
 
-The ZIP archive contains the generated analysis artifacts from the working report directory.
+Before reporting success, the launcher verifies:
 
-### 7.3 Severity Classifications
+- ZIP integrity.
+- Presence of the HTML report.
+- Presence of normalized JSON.
+- Exclusion of prohibited raw scanner artifacts.
 
-The reporting system supports five severity levels:
+Raw scanner outputs may be retained locally for diagnostics, but prohibited raw secret-scanner artifacts are not included in the distributable ZIP.
 
-| Severity | General Meaning |
-|---|---|
-| Critical | Highest-priority findings |
-| High | Significant issues requiring attention |
-| Medium | Moderate-priority issues |
-| Low | Lower-priority findings |
-| Info | Informational findings |
+### 8.4 Generated Artifacts
 
-Each scanner's native severity or priority values are mapped to these classifications.
+Downloaded scanner tools and generated reports should remain outside version control.
 
-Not every scanner produces findings at every severity level.
+Do not commit generated reports containing potentially sensitive findings.
 
-### 7.4 Generated Artifacts
+## 9. Exit Codes and Advisory Behavior
 
-The following directories are excluded from Git:
+The Local Quality Gate distinguishes scanner outcomes from infrastructure failures.
 
-```text
-quality/Local_Scans/tools/
-quality/Local_Scans/reports/
-```
+| Condition                                             | Launcher behavior                                 |
+|-------------------------------------------------------|---------------------------------------------------|
+| Completed scan with no findings                       | Returns `0`                                       |
+| Completed advisory scan with findings                 | Returns `0`                                       |
+| Completed advisory scan with scanner execution errors | Returns `0` when reporting completes successfully |
+| Invalid project configuration                         | Can return `2`                                    |
+| Missing compatible Python interpreter                 | Returns `2`                                       |
+| Report generation or validation failure               | Can terminate with a nonzero status               |
+| Invalid final normalized summary                      | Returns `2`                                       |
 
-Generated reports and downloaded scanner distributions should remain local to the development environment.
+A zero exit code means the advisory workflow completed; it does not guarantee that every scanner ran successfully or that no findings exist.
 
----
+Always inspect the scanner summary and generated report.
 
-## 8. Negative-Test Fixture
+The pre-commit hook intentionally returns `0` for handled launcher failures, allowing the Git commit to proceed.
 
-### 8.1 Purpose
+## 10. Relationship to the CI Quality Gate
 
-The shared negative-test fixture is located at:
+Quality Gates has two execution contexts.
 
-`quality/fixtures/negative/SampleErrorClass.java`
+| Capability           | Local Quality Gate                        | CI Quality Gate                                      |
+|----------------------|-------------------------------------------|------------------------------------------------------|
+| Primary execution    | Developer machine                         | GitHub Actions                                       |
+| Scanner inventory    | Nine registered scanners                  | Twelve registered scanners                           |
+| Enforcement          | Advisory                                  | Policy-driven                                        |
+| Git commit blocking  | No                                        | Not directly; repository rules can require CI checks |
+| Reporting            | HTML, normalized JSON, ZIP                | CI reports and workflow artifacts                    |
+| Shared functionality | Reuses CI parsers and framework utilities | Uses shared framework utilities                      |
 
-This class intentionally contains coding-standard violations, maintainability problems, and potential defects.
+The CI Quality Gate evaluates results using its configured policy.
 
-It is designed to verify that the static analysis tools detect problematic Java code.
+See:
 
-### 8.2 Fixture Requirements
+- `quality/CI/README.md`
+- `quality/CI/gate/policy.yaml`
 
-The fixture must:
+Local findings should be addressed before opening a pull request, even though the local hook does not block commits.
 
-1. Remain outside the production Java source directory.
-2. Never be included in a production application build or deployment.
-3. Remain available for repeatable negative testing.
-4. Be version-controlled as a shared testing resource.
-5. Be reusable by future local and CI quality-gate tests.
+## 11. Testing and Verification
 
-The production source directory is:
+Local regression tests are located under:
 
-`backend/src/main/java/`
+`quality/Local_Scans/tests/`
 
-### 8.3 Future Automation
-
-An isolated negative-test workflow is planned.
-
-This workflow should verify that known violations are detected and that the quality gate returns the appropriate failure status without modifying production source files.
-
----
-
-## 9. Troubleshooting
-
-### 9.1 Java Version Problems
-
-Verify the installed Java version:
+From the repository root, run:
 
 ```bash
-java -version
+python3 -m unittest discover \
+  -s quality/Local_Scans/tests \
+  -p 'test_*.py' \
+  -v
 ```
 
-EPMS currently targets Java 25 LTS.
+Project configuration tests can be run with:
 
-### 9.2 Python Not Found
+```bash
+python3 -m unittest quality.shared.tests.test_project_config -v
+```
 
-Verify Python:
+These tests validate selected framework behaviors. They do not replace full scanner execution or testing in a separate host repository.
+
+Before declaring a new installation successful, verify configuration loading, scanner applicability, report generation, and actual scanner execution.
+
+## 12. Troubleshooting
+
+### 12.1 Python Is Missing or Unsupported
+
+Check:
 
 ```bash
 python3 --version
@@ -375,125 +400,83 @@ python3 --version
 
 Python 3.10 or newer is required.
 
-The runner also checks for compatible Python commands available in the environment.
+### 12.2 Java or Maven Is Unavailable
 
-### 9.3 Scanner Distribution Missing
+Check:
 
-Verify that the required scanner distributions exist under:
+```bash
+java -version
+mvn -version
+```
 
-`quality/Local_Scans/tools/`
+If using a Maven Wrapper, verify that it exists and is executable.
 
-Review the relevant script under `checks/` for expected paths, filenames, and installation behavior.
+### 12.3 Scanner Downloads Fail
 
-### 9.4 HTML Report Does Not Open
+Check network access and the availability of the required download tools.
 
-Open the following file manually in a browser:
+Review the corresponding wrapper under `quality/Local_Scans/checks/`.
+
+### 12.4 TruffleHog Reports a Docker Error
+
+Verify that Docker is installed and the Docker engine is running.
+
+A Docker execution failure must not be interpreted as a clean secret scan.
+
+### 12.5 Scanner Is Disabled
+
+Review the configured source directories and scanner prerequisites.
+
+A disabled scanner has not completed an analysis.
+
+### 12.6 HTML Report Does Not Open
+
+Open:
 
 `quality/Local_Scans/reports/work/local-report.html`
 
-### 9.5 PMD Incremental Analysis Warning
+### 12.7 Git Hook Does Not Execute
 
-PMD 7.29.0 may display a warning recommending Incremental Analysis.
-
-This is an informational performance recommendation, not a quality-gate failure.
-
-Incremental Analysis is deferred as a future improvement.
-
-### 9.6 Git Hook Does Not Execute
-
-Verify the hooks configuration:
+Check:
 
 ```bash
 git config --local --get core.hooksPath
+ls -l quality/Local_Scans/hooks/pre-commit
 ```
 
-Verify executable permissions on macOS/Linux:
+Ensure that the configured hooks directory is correct and the hook is executable.
 
-```bash
-ls -l ../quality/Local_Scans/hooks/pre-commit
-```
+### 12.8 Project Configuration Is Rejected
 
-The hook must be executable for Git to invoke it.
+Review `quality/project.json` for unsupported values, invalid paths, or missing configured directories.
 
----
+Use `quality/project.example.json` as the starting template.
 
-## 10. Relationship to the CI Quality Gate
+## 13. Portability and Known Limitations
 
-BN1 is local and advisory; it does not block commits. The CI Quality Gate runs on GitHub Actions and evaluates scanner results using `quality/CI/gate/policy.yaml`.
+The Quality Gates framework is being prepared for use outside its original host repository.
 
-| Capability | BN1 — Local | CI Quality Gate |
-|---|---|---|
-| Execution | Manual or pre-commit | PRs and pushes to `main` |
-| Scanners | 9 registered; 7 applicable to EPMS | 12 registered |
-| Reports | HTML and timestamped ZIP | Markdown, HTML, analysis artifact |
-| Enforcement | Advisory | Policy-driven; required checks depend on GitHub rulesets |
-| Verification | 2026-11-17 local run | GitHub Actions runs #19 and #20 succeeded |
+Current limitations include:
 
-See `quality/CI/gate/README.md` for technical contracts and CI reporting.
+- Java wrappers designed for Maven-based projects.
+- Incomplete verification of non-Java-only repositories.
+- Unverified Windows execution.
+- Unverified fresh-environment scanner installation.
+- Incomplete validation in a separate consuming repository.
+- CI workflow integration that still requires cross-project verification.
 
-## 11. Verified Results
+The framework should not yet be described as universally compatible or fully standalone.
 
-The following tests have been completed during BN1 development:
+For the integration procedure and portability validation plan, see [PORTABILITY.md](../PORTABILITY.md).
 
-### 11.1 Negative Testing
+## 14. Documentation
 
-A deliberately defective Java class was used to verify scanner detection.
+Additional technical documentation:
 
-All three Java scanners detected violations in this historical negative test; the current BN1 hook is advisory and does not reject commits.
+- [Scanner wrappers](checks/checks_README.md)
+- [Git hooks](hooks/hooks_README.md)
+- [Reporting](reporting/report_README.md)
+- [Portability and integration](../PORTABILITY.md)
+- [CI Quality Gate](../CI/README.md)
 
-### 11.2 Clean Static Analysis
-
-After resolving the identified violations, all three scanners passed:
-
-| Scanner | Result | Findings |
-|---|---|---|
-| Checkstyle | PASSED | 0 |
-| PMD | PASSED | 0 |
-| SpotBugs | PASSED | 0 |
-
-Overall result: **APPROVED**
-
-### 11.3 Maven Tests
-
-The EPMS backend test suite completed successfully:
-
-- Tests executed: 77
-- Failures: 0
-- Errors: 0
-- Skipped: 0
-
-### 11.4 Pre-Commit Hook Test
-
-The pre-commit hook was executed directly on macOS.
-
-Results:
-
-- Git hooks path verified.
-- Executable permissions verified.
-- All three scanners passed.
-- HTML report generated.
-- ZIP report generated.
-- Hook exit status: `0`.
-
-No Git commit was created during that earlier direct-hook test; a later Git-triggered commit was verified on 2026-11-17.
-
----
-
-## 12. Future Improvements
-
-The following enhancements are deferred:
-
-1. Implement PMD Incremental Analysis to improve scanning performance.
-2. Automate isolated negative-test execution using the shared fixture.
-3. Verify the Windows batch launcher on a Windows development machine.
-4. Establish reproducible scanner installation for fresh development environments.
-5. Maintain alignment between BN1 reporting and the implemented CI Quality Gate.
-6. Verify Git's automatic pre-commit invocation during an approved commit.
-
----
-
-## 13. Current Status
-
-BN1 is implemented and advisory. On 2026-11-17 seven scanners (Checkstyle, PMD, SpotBugs, Pylint, Bandit, Gitleaks, TruffleHog) completed cleanly, HTMLHint and Stylelint were disabled, and there were zero findings and zero scanner errors.
-
-The hook ran during Git commit `40760b9`. The earlier three-scanner and Java test results in section 11 are historical development checks, not the current complete scanner inventory. Fresh-environment and cross-project portability remain to be verified.
+These documents should be maintained together whenever scanner behavior, configuration, or reporting contracts change.

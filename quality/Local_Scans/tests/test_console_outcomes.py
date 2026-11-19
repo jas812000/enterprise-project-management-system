@@ -1,4 +1,4 @@
-"""Tests for BN1 per-scanner console outcome messages."""
+"""Tests for Local Quality Gate per-scanner console outcome messages."""
 
 import unittest
 

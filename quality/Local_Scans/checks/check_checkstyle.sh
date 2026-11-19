@@ -1,9 +1,9 @@
 #!/bin/sh
 
 # ==========================================================
-# EPMS — Checkstyle Local Quality Gate
+# Checkstyle — Local Quality Gate
 # ----------------------------------------------------------
-# Runs Checkstyle against backend/src/main/java.
+# Runs Checkstyle against the configured Java source directory.
 # Downloads and verifies the Checkstyle JAR when needed.
 #
 # Arguments:
@@ -41,7 +41,7 @@ OUT="${WORK_DIR}/checkstyle.xml"
 # ----------------------------------------------------------
 
 if [ -z "${PYTHON_CMD:-}" ]; then
-  echo "ERROR: PYTHON_CMD is not set. Run Checkstyle through the EPMS orchestrator." >&2
+  echo "ERROR: PYTHON_CMD is not set. Run Checkstyle through the Local Quality Gate orchestrator." >&2
   exit 2
 fi
 

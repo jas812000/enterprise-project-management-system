@@ -1,4 +1,3 @@
-
 """
 Regression tests for secret scanner security.
 

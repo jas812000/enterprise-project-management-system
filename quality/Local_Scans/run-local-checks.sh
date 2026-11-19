@@ -1,29 +1,26 @@
 #!/bin/sh
 
 # ==========================================================
-# Local Quality Gate (BN1) — Entry Point
+# Local Quality Gate — macOS/Linux Shell Launcher
 # ----------------------------------------------------------
-# Runs local static analysis and security checks, generates
-# an HTML report, packages scan artifacts into a ZIP archive,
-# and opens the report in the default browser.
+# Entry point for the advisory Local Quality Gate.
 #
-# Usage (from the host repository root):
-#   sh quality/Local_Scans/run-local-checks.sh
+# Runs static analysis and security checks, generates an
+# HTML report, packages validated reporting artifacts into
+# a ZIP archive, and attempts to open the HTML report.
 #
-# Scanner prerequisites and enforcement policies are
-# documented in quality/Local_Scans/README.md.
+# Usage, prerequisites, and troubleshooting:
+#   quality/Local_Scans/README.md
+#
+# Cross-project installation:
+#   quality/PORTABILITY.md
 # ==========================================================
 
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# Optional configuration is resolved relative to the host repository.
-QUALITY_CONFIG="${QUALITY_CONFIG:-${REPO_ROOT}/quality/project.json}"
-if [ -f "${QUALITY_CONFIG}" ]; then
-  eval "$(python3 "${SCRIPT_DIR}/../project_config.py" --shell "${REPO_ROOT}" "${QUALITY_CONFIG}")"
-fi
-export QUALITY_JAVA_SOURCE QUALITY_MAVEN_DIR QUALITY_SCAN_ROOT QUALITY_PYTHON_SOURCE QUALITY_JS_SOURCE QUALITY_PROJECT_NAME QUALITY_JAVA_VERSION QUALITY_CONFIG
+
 CHECKS_DIR="${SCRIPT_DIR}/checks"
 REPORT_DIR="${SCRIPT_DIR}/reporting"
 TOOLS_DIR="${SCRIPT_DIR}/tools"
@@ -40,7 +37,7 @@ export PYTHONPATH="${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 # Shared CI parsers require a workspace root to safely turn absolute
 # local scanner filenames into repository-relative paths. Keep the CI
-# path validator unchanged; supply its expected context in BN1.
+# path validator unchanged; supply its expected context in the Local Quality Gate.
 export GITHUB_WORKSPACE="${REPO_ROOT}"
 
 # Resolve a Python 3 interpreter across supported platforms.
@@ -61,7 +58,7 @@ if [ -z "${PYTHON_CMD}" ] &&
 fi
 
 if [ -z "${PYTHON_CMD}" ]; then
-  echo "ERROR: Python 3.10 or newer is required for the EPMS local quality gate."
+  echo "ERROR: Python 3.10 or newer is required for the Local Quality Gate."
   exit 2
 fi
 
@@ -75,6 +72,23 @@ run_python() {
 
 # Share the selected Python interpreter with scanner wrappers.
 export PYTHON_CMD
+
+# Load the host project's configuration using the validated Python interpreter.
+QUALITY_CONFIG="${QUALITY_CONFIG:-${REPO_ROOT}/quality/project.json}"
+
+if [ -f "${QUALITY_CONFIG}" ]; then
+  if ! CONFIG_EXPORTS="$(run_python "${SCRIPT_DIR}/../project_config.py" \
+    --shell "${REPO_ROOT}" "${QUALITY_CONFIG}")"; then
+    echo "ERROR: Unable to load Quality Gates project configuration." >&2
+    exit 2
+  fi
+
+  eval "${CONFIG_EXPORTS}"
+fi
+
+export QUALITY_JAVA_SOURCE QUALITY_MAVEN_DIR QUALITY_SCAN_ROOT
+export QUALITY_PYTHON_SOURCE QUALITY_JS_SOURCE QUALITY_PROJECT_NAME
+export QUALITY_JAVA_VERSION QUALITY_CONFIG
 
 TIMESTAMP="$(date '+%Y-%m-%d-%H%M%S')"
 
@@ -105,7 +119,7 @@ then
   exit 2
 fi
 
-# Maintain one consolidated ZIP report per EPMS installation.
+# Maintain one consolidated ZIP report per project installation.
 ZIP_PATH="${OUTPUT_DIR}/local-quality-report-${TIMESTAMP}.zip"
 GENERATED_AT="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 SCAN_USER="$(whoami)"
@@ -125,7 +139,7 @@ SB_STATUS="skipped"
 # ----------------------------------------------------------
 echo ""
 echo "=============================="
-echo " Local Quality Gate (BN1)"
+echo " Local Quality Gate"
 echo "=============================="
 
 
@@ -317,7 +331,7 @@ run_python "${REPORT_DIR}/open_report.py"
 
 
 # ----------------------------------------------------------
-# Final BN1 summary — all nine scanners
+# Final Local Quality Gate summary — all nine scanners
 # ----------------------------------------------------------
 echo ""
 echo "=========================================="
@@ -447,7 +461,7 @@ else:
     else:
         print(" Result: ADVISORY — all scanners clean")
 
-    print(" Commits are not blocked by BN1.")
+    print(" Commits are not blocked by the Local Quality Gate.")
 
 PY
 then
@@ -459,14 +473,14 @@ fi
 echo "=========================================="
 echo ""
 if [ "${SUMMARY_EXIT}" -ne 0 ]; then
-  echo "ERROR: BN1 could not produce a valid final summary." >&2
+  echo "ERROR: Local Quality Gate could not produce a valid final summary." >&2
   exit 2
 fi
 
 echo " Report saved to: ${ZIP_PATH}"
 echo ""
 
-# BN1 remains advisory:
+# The Local Quality Gate remains advisory:
 # Scanner findings and scanner execution errors are reported,
 # but do not block commits.
 exit 0

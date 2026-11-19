@@ -1,10 +1,10 @@
 
-"""Scanner registry for the EPMS advisory Local Quality Gate."""
+"""Scanner registry for the advisory Local Quality Gate."""
 
 from quality.CI.gate.normalize import TOOL_PARSERS
 from quality.CI.gate.scanner_artifacts import SCANNER_ARTIFACTS
 
-# BN1 uses nine of the twelve scanners configured in BN2.
+# The Local Quality Gate uses nine of the twelve CI Quality Gate scanners.
 LOCAL_SCANNER_NAMES = (
     "trufflehog",
     "gitleaks",

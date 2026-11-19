@@ -1,1 +1,1 @@
-"""Shared, pipeline-independent EPMS quality utilities."""
+"""Shared, pipeline-independent Quality Gates utilities."""

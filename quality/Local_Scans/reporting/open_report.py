@@ -1,5 +1,5 @@
 """
-Open the EPMS local quality report in the default browser.
+Open the local quality report in the default browser.
 
 Browser-launch failures are nonfatal because the HTML report
 remains available on disk.

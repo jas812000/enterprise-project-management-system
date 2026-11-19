@@ -1,6 +1,6 @@
 # File: quality/CI/gate/policy.yaml
 # ==========================================================
-# EPMS CI Quality & Security Enforcement Policy
+# Quality Gates CI Quality & Security Enforcement Policy
 # ==========================================================
 # This file is the governance contract for the CI Quality Gate.
 #

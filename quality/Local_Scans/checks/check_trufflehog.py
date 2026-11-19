@@ -1,5 +1,5 @@
 
-"""Run the EPMS TruffleHog filesystem scan."""
+"""Run the local TruffleHog filesystem scan."""
 
 import json
 import shutil

@@ -1,136 +1,256 @@
-# EPMS Static Analysis Checks
+# Local Quality Gate — Scanner Wrappers
 
 ## 1. Overview
 
-The `checks/` directory contains the scanner execution scripts used by the EPMS Local Quality Gate (BN1).
+The `quality/Local_Scans/checks/` directory contains scanner execution components used by the Local Quality Gate.
 
-Each script executes one static analysis tool against the Java backend, generates machine-readable results, and returns a standardized exit code.
+Three shell wrappers execute Java static-analysis tools:
 
-The main quality-gate runner coordinates all applicable scanners. This section originally described the three Java wrappers.
+- Checkstyle
+- PMD
+- SpotBugs
 
-## Current scanner inventory
+Additional scanner components support Pylint, Bandit, Gitleaks, TruffleHog, HTMLHint, and Stylelint.
 
-The BN1 runner registers Checkstyle, PMD, SpotBugs, Pylint, Bandit, Gitleaks, TruffleHog, HTMLHint, and Stylelint. Seven were clean for EPMS on 2026-11-17; HTMLHint and Stylelint were disabled because no applicable source was configured.
+The Local Quality Gate registers nine scanners in total.
 
-Configure repository-relative paths in `quality/project.json` and run from the repository root:
+The main launcher coordinates execution, collects scanner outcomes, normalizes results, and generates consolidated reports.
 
-```bash
-bash quality/Local_Scans/run-local-checks.sh
-```
+For general execution instructions, see `quality/Local_Scans/README.md`.
 
-Docker must be running for containerized TruffleHog. An execution error is not a clean scan. The pre-commit hook is advisory. See `quality/PORTABILITY.md`.
+For integration into another repository, see `quality/PORTABILITY.md`.
 
-## 2. Static Analysis Tools
+## 2. Java Scanner Inventory
 
-| Script | Tool | Version | Purpose |
+| Wrapper | Scanner | Version | Purpose |
 |---|---|---|---|
 | `check_checkstyle.sh` | Checkstyle | 14.4.0 | Java coding standards and formatting |
-| `check_pmd.sh` | PMD | 7.29.0 | Code quality and maintainability |
+| `check_pmd.sh` | PMD | 7.29.0 | Static code quality and maintainability |
 | `check_spotbugs.sh` | SpotBugs | 4.10.5 | Bytecode defect analysis |
 
-The scanners analyze production Java code under:
+The wrappers use the following project configuration variables:
 
-`backend/src/main/java/`
+| Variable | Used by | Purpose |
+|---|---|---|
+| `QUALITY_JAVA_SOURCE` | Checkstyle, PMD | Java source directory |
+| `QUALITY_MAVEN_DIR` | SpotBugs | Maven project directory |
 
-SpotBugs additionally compiles the backend and builds its Maven dependency classpath before analysis.
+These variables are normally supplied by `quality/project_config.py` through the main launcher.
 
-## 3. Execution Flow
+Without explicit configuration, the wrappers retain legacy defaults:
 
-The scanner scripts are executed by:
+- Java source: `backend/src/main/java`
+- Maven project: `backend`
+
+Those defaults are not appropriate for every consuming repository.
+
+## 3. Wrapper Arguments
+
+Each Java wrapper accepts three positional arguments:
+
+1. `REPO_ROOT` — Root directory of the consuming repository.
+2. `WORK_DIR` — Temporary directory for scanner results.
+3. `TOOLS_DIR` — Directory containing downloaded scanner dependencies.
+
+The wrappers are intended to be invoked by:
 
 `quality/Local_Scans/run-local-checks.sh`
 
-Execution sequence:
+Direct execution is not the normal user workflow.
+
+The main launcher prepares the execution environment and supplies the required arguments and configuration.
+
+## 4. Execution Sequence
+
+The main launcher attempts the Java scanners in this order:
 
 1. Checkstyle
 2. PMD
 3. SpotBugs
-4. HTML report generation
-5. ZIP report packaging
 
-All three scanners execute even when an earlier scanner reports violations.
+Each scanner's result is recorded independently.
 
-Each scanner wrapper receives three arguments:
+A finding or execution error in one Java scanner does not automatically prevent the remaining Java scanners from being attempted.
 
-1. `REPO_ROOT` — EPMS repository root.
-2. `WORK_DIR` — Directory for generated scanner results.
-3. `TOOLS_DIR` — Directory for scanner dependencies.
+After these wrappers execute, the launcher invokes:
 
-The scanner scripts are intended to run through the main quality-gate runner rather than as standalone commands.
+`quality.Local_Scans.local_pipeline`
 
-## 4. Exit Codes
+The Python pipeline coordinates additional scanners and normalization.
 
-| Exit Code | Meaning |
+The Local Quality Gate then generates the consolidated report and ZIP archive.
+
+The complete workflow is documented in `quality/Local_Scans/README.md`.
+
+## 5. Exit-Code Contract
+
+The Java wrappers use the following exit-code convention:
+
+| Exit code | Meaning |
 |---|---|
-| `0` | Scanner completed successfully with no violations |
-| `1` | Scanner completed and detected violations |
+| `0` | Scanner completed successfully without findings |
+| `1` | Scanner completed and detected findings |
 | `2` | Scanner execution or report-validation error |
 
-The main runner collects these results and determines the overall gate status.
+The main launcher translates these outcomes into scanner statuses for reporting.
 
-When configured as a Git pre-commit hook, any nonzero overall result blocks the commit.
+An execution error must not be treated as a clean scan.
 
-## 5. Scanner Dependencies
+### Advisory Enforcement
 
-Scanner distributions are stored under:
+The Local Quality Gate is advisory.
+
+Scanner findings and handled scanner execution errors are reported but do not block commits through the provided pre-commit hook.
+
+Successful completion of the reporting workflow may return exit code `0` even when scanner findings or errors were recorded.
+
+This differs from the CI Quality Gate, which applies its configured enforcement policy.
+
+See `quality/CI/README.md`.
+
+## 6. Scanner Dependencies
+
+Downloaded Java scanner distributions are stored under:
 
 `quality/Local_Scans/tools/`
 
-The scripts automatically download missing scanner distributions when their required utilities and network access are available.
+The wrappers download missing distributions when the required utilities and network access are available.
 
-- Checkstyle verifies its JAR using a configured SHA-256 checksum.
-- PMD validates the downloaded ZIP archive.
-- SpotBugs verifies its downloaded archive using a configured SHA-256 checksum during installation.
+### Checkstyle
 
-The `tools/` directory is excluded from Git.
+Checkstyle requires Java.
 
-Scanner distributions must not be committed.
+Its wrapper downloads the configured JAR and validates it against the expected SHA-256 checksum.
 
-## 6. Output Files
+It also uses the Python interpreter selected by the main launcher for checksum processing.
 
-Raw scanner results are written to:
+### PMD
+
+PMD requires Java and utilities including:
+
+- Python 3
+- curl
+- unzip
+
+The wrapper downloads and validates the PMD distribution archive.
+
+### SpotBugs
+
+SpotBugs requires:
+
+- Java
+- Python 3
+- Maven or an executable Maven Wrapper
+- Download and extraction utilities when installation is needed
+
+The wrapper validates the downloaded distribution against its configured SHA-256 checksum.
+
+SpotBugs compiles the configured Maven project and builds the dependency classpath before analyzing compiled bytecode.
+
+### Generated Dependencies
+
+Downloaded scanner distributions must not be committed to version control.
+
+The `tools/` directory is intended for generated local dependencies.
+
+## 7. Raw Scanner Outputs
+
+The Java wrappers generate machine-readable XML results:
+
+| Scanner | Output |
+|---|---|
+| Checkstyle | `checkstyle.xml` |
+| PMD | `pmd.xml` |
+| SpotBugs | `spotbugs.xml` |
+
+These files are written to the working directory supplied by the main launcher.
+
+During normal execution, that directory is under:
 
 `quality/Local_Scans/reports/work/`
 
-The primary XML artifacts are:
+The reporting pipeline processes scanner results to produce normalized findings and consolidated reports.
 
-```text
-checkstyle.xml
-pmd.xml
-spotbugs.xml
-```
+Raw scanner artifacts are working files and should not be committed.
 
-These files are processed by the Python reporting engine to generate the consolidated HTML report.
+## 8. Additional Scanners
 
-Generated reports are excluded from version control.
+The Local Quality Gate also registers:
 
-## 7. Design Principles
+- Pylint
+- Bandit
+- Gitleaks
+- TruffleHog
+- HTMLHint
+- Stylelint
 
-Scanner scripts should:
+Their execution is coordinated through the Local Quality Gate's Python-based orchestration components.
 
-1. Produce machine-readable analysis results.
-2. Distinguish quality violations from execution errors.
-3. Validate generated reports before accepting their results.
-4. Avoid modifying production Java source files.
-5. Use consistent exit codes.
-6. Support repeatable local execution.
+Applicability depends on the configured source layout, scanner implementation, and available prerequisites.
 
-The scanners may create build outputs, download dependencies, and generate reports, but must not rewrite production source code.
+Possible normalized outcomes include:
 
-## 8. Negative Testing
+- CLEAN
+- FINDINGS
+- DISABLED
+- ERROR
 
-The reusable negative-test fixture is located at:
+A disabled scanner has not performed analysis.
+
+A scanner execution error is not equivalent to a clean result.
+
+## 9. Design Requirements
+
+Scanner components should:
+
+1. Produce machine-readable results.
+2. Distinguish findings from execution failures.
+3. Validate reports before accepting successful outcomes.
+4. Avoid modifying production source files.
+5. Respect the consuming repository's configured source paths.
+6. Support repeatable execution.
+7. Preserve scanner-specific diagnostic information.
+8. Integrate with the shared normalization and reporting workflow.
+
+Scanner execution may create temporary files, downloaded dependencies, and build outputs.
+
+It must not intentionally rewrite production source code.
+
+## 10. Negative Testing
+
+The framework includes a negative-test fixture at:
 
 `quality/fixtures/negative/SampleErrorClass.java`
 
-It intentionally contains defects used to verify scanner detection.
+The fixture intentionally contains defects for scanner-detection testing.
 
-The fixture must remain outside production source directories.
+It must remain outside production source directories.
 
-An automated isolated negative-test workflow is planned.
+An isolated, automated negative-test workflow remains planned.
 
-## 9. Current Status
+## 11. Portability Considerations
 
-The original Java wrapper and negative-test details above remain technical reference material. The current BN1 also runs Python and secret scanners. On 2026-11-17, seven scanners completed cleanly, two were disabled, and no scanner errors occurred.
+The current Java wrappers assume a Maven-based Java project.
 
-Cross-platform and separate-project verification remain outstanding.
+They are not yet verified for arbitrary Gradle-based, Python-only, or JavaScript-only consuming repositories.
+
+Checkstyle and PMD use configurable Java source paths.
+
+SpotBugs uses a configurable Maven project path.
+
+Some wrappers currently invoke `python3` directly, while Checkstyle uses the interpreter selected by the main launcher.
+
+This difference requires further portability review.
+
+Windows execution and independent host-repository integration remain unverified.
+
+Do not interpret successful configuration loading as proof that every scanner can execute successfully.
+
+## 12. Related Documentation
+
+- `quality/Local_Scans/README.md` — Local Quality Gate overview
+- `quality/Local_Scans/hooks/hooks_README.md` — Advisory Git hook
+- `quality/Local_Scans/reporting/report_README.md` — Reporting
+- `quality/CI/README.md` — CI Quality Gate
+- `quality/PORTABILITY.md` — Cross-project integration
+- `quality/project.example.json` — Project configuration template

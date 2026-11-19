@@ -19,10 +19,10 @@ Environment variables (set by run-local-checks.sh):
     SB_STATUS      - passed | failed | error | skipped
     FAILED         - number of failed Java quality checks
 
-BN1 operates in advisory mode. Scanner findings and
+The Local Quality Gate operates in advisory mode. Scanner findings and
 execution errors do not prevent Git commits.
 
-The normalized results use the existing BN2 CI parsers
+The normalized results use the existing CI Quality Gate parsers
 and severity classifications.
 """
 
@@ -161,10 +161,10 @@ def main() -> None:
         "pmd_sev": pmd_sev,
         "sb_sev": sb_sev,
 
-        # All nine scanners, normalized using BN2 parsers
+        # All nine scanners, normalized using CI Quality Gate parsers
         "normalized": normalized,
 
-        # BN1 does not enforce quality thresholds
+        # The Local Quality Gate does not enforce quality thresholds
         "gate_mode": "advisory",
     }
 

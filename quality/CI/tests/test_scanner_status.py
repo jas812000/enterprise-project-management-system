@@ -1,4 +1,4 @@
-"""Tests for EPMS CI scanner execution-status handling."""
+"""Tests for CI Quality Gate scanner execution-status handling."""
 
 import json
 import tempfile
@@ -18,7 +18,7 @@ def _temporary_workspace():
 
 
 class ScannerStatusTests(unittest.TestCase):
-    """Regression tests for the corresponding EPMS quality component."""
+    """Regression tests for the corresponding CI Quality Gate component."""
 
     def setUp(self):
         """Set up the test fixture."""

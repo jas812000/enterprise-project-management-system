@@ -2,19 +2,20 @@
 setlocal
 
 REM ==========================================================
-REM Local Quality Gate (BN1) - Windows Launcher
+REM Local Quality Gate — Windows Batch Launcher
 REM ----------------------------------------------------------
-REM Location:
-REM   quality\Local_Scans\run-local-checks.bat
+REM Entry point for the advisory Local Quality Gate.
 REM
-REM Requirements:
-REM   Git for Windows (Git Bash)
-REM   Java
-REM   Python 3.10+
-REM   Maven Wrapper prerequisites
-REM   Network access for initial scanner downloads
+REM Uses Git Bash to execute the main shell-based scanning
+REM workflow, including report generation and packaging.
 REM
-REM Runs the main shell-based quality gate through Git Bash.
+REM Usage, prerequisites, and troubleshooting:
+REM   quality/Local_Scans/README.md
+REM
+REM Cross-project installation:
+REM   quality/PORTABILITY.md
+REM
+REM Windows execution has not yet been fully verified.
 REM ==========================================================
 
 set "GIT_BASH="

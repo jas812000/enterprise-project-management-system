@@ -1,5 +1,5 @@
 """
-Regression tests for EPMS Quality Gate report security.
+Regression tests for CI Quality Gate report security.
 
 Verifies HTML and Markdown rendering protections against
 unsafe URLs and injected environment metadata.

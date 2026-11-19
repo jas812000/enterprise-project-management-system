@@ -1,5 +1,5 @@
 
-# EPMS BN1 Python scanner dependencies
+# Local Quality Gate Python scanner dependencies
 # Verified with Python 3.11.1 on the Intel iMac.
 
 pylint==2.15.10

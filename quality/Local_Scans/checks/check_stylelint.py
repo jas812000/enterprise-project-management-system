@@ -1,5 +1,5 @@
 
-"""Run Stylelint using the EPMS CI configuration."""
+"""Run Stylelint using the shared CI configuration."""
 
 import shutil
 import subprocess  # nosec B404 - required for fixed-argument scanner execution

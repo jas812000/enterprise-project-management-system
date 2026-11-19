@@ -1,5 +1,5 @@
 
-"""Execute the six additional BN1 scanners.
+"""Execute the six additional Local Quality Gate scanners.
 
 Raw artifacts are stored outside the repository and report ZIP.
 """

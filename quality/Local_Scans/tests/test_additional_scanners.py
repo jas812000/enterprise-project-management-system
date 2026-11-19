@@ -1,5 +1,4 @@
-
-"""Tests for additional BN1 scanner orchestration."""
+"""Tests for additional Local Quality Gate scanner orchestration."""
 
 import json
 import unittest

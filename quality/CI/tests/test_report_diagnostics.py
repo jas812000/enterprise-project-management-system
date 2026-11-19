@@ -1,6 +1,6 @@
 
 """
-Regression tests for EPMS diagnostic report preparation.
+Regression tests for CI diagnostic report preparation.
 
 Verify that detailed reports preserve actionable findings,
 redact secret-scanner values, and do not modify the original data.

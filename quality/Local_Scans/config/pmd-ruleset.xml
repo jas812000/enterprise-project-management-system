@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ruleset name="EPMS Java Quality Rules"
+<ruleset name="Local Quality Gate Java Quality Rules"
          xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.github.io/schema/ruleset_2_0_0.xsd">
 
     <description>
-        EPMS Java static analysis rules.
+        Java static analysis rules for the Local Quality Gate.
 
         Enforces PMD Best Practices, Error Prone, and selected
         Code Style rules while excluding overly restrictive

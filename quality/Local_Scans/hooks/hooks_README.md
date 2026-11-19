@@ -1,58 +1,110 @@
-# EPMS Git Hooks — Local Quality Gate Integration
+# Local Quality Gate — Git Hook Integration
 
 ## 1. Overview
 
-The `hooks/` directory contains Git hooks used to integrate the EPMS Local Quality Gate (BN1) into the development workflow.
+The `quality/Local_Scans/hooks/` directory contains Git hooks for integrating the Local Quality Gate into a developer's Git workflow.
 
-The pre-commit hook automatically executes the local quality checks before Git creates a commit.
+The provided `pre-commit` hook executes the Local Quality Gate before Git creates a commit.
 
-Its purpose is to detect coding-standard violations, maintainability issues, and potential defects before changes enter the repository history.
+Its purpose is to provide early feedback about static-analysis findings, security findings, scanner execution errors, and disabled scanners.
+
+**The Local Quality Gate is advisory.**
+
+The provided hook does not intentionally block commits because of scanner findings or handled scanner execution failures.
+
+CI Quality Gate enforcement is configured separately through GitHub Actions.
 
 ## 2. Available Hooks
 
-| Hook | Purpose | Status |
+| Hook | Purpose | Enforcement |
 |---|---|---|
-| `pre-commit` | Executes the BN1 Local Quality Gate before committing | Implemented |
+| `pre-commit` | Runs the Local Quality Gate before a commit | Advisory |
 
 The hook invokes:
 
 `quality/Local_Scans/run-local-checks.sh`
 
-The quality gate runs Checkstyle, PMD, and SpotBugs against the Java backend.
+The Local Quality Gate coordinates nine registered scanners:
+
+- Checkstyle
+- PMD
+- SpotBugs
+- Pylint
+- Bandit
+- Gitleaks
+- TruffleHog
+- HTMLHint
+- Stylelint
+
+Scanner applicability depends on the consuming project's configuration and available dependencies.
 
 ## 3. Installation
 
 Git does not automatically activate custom repository hooks after cloning.
 
-From the EPMS repository root, configure the local hook directory:
+Each developer must configure the hook locally.
+
+### Step 1 — Open the Repository Root
+
+From the consuming repository:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+Run the remaining commands from that repository's root directory.
+
+### Step 2 — Configure the Hook Directory
 
 ```bash
 git config --local core.hooksPath quality/Local_Scans/hooks
 ```
 
-Ensure the hook is executable on macOS or Linux:
+This tells Git to look for hooks in the specified directory.
+
+The setting is stored in the local repository configuration and is not automatically shared with other clones.
+
+### Step 3 — Make the Hook Executable
+
+On macOS/Linux:
 
 ```bash
 chmod +x quality/Local_Scans/hooks/pre-commit
 ```
 
-Verify the configuration:
+### Step 4 — Verify Installation
 
 ```bash
-git config --local --get core.hooksPath
+git config --show-origin --get core.hooksPath
 ```
 
-Expected output:
+Expected configured value:
 
 ```text
 quality/Local_Scans/hooks
 ```
 
-This configuration applies only to the current local Git repository.
+The output also identifies the configuration source.
 
-Each developer must configure the hook independently.
+## 4. Existing Git Hook Considerations
 
-## 4. Pre-Commit Execution Flow
+Git uses one effective `core.hooksPath` setting.
+
+If the consuming repository already uses custom hooks, changing this setting can prevent those hooks from running.
+
+Before installation, inspect:
+
+```bash
+git config --show-origin --get core.hooksPath
+```
+
+If an existing hook directory is configured, review its contents and determine how the Local Quality Gate should be integrated.
+
+Do not replace existing security, formatting, or validation hooks without reviewing their purpose.
+
+The provided installation procedure assumes that using `quality/Local_Scans/hooks` is acceptable for the consuming repository.
+
+## 5. Pre-Commit Execution Flow
 
 When a developer runs:
 
@@ -60,9 +112,15 @@ When a developer runs:
 git commit
 ```
 
-Git invokes the configured pre-commit hook before creating the commit.
+Git invokes the configured pre-commit hook.
 
-Execution flow:
+The hook attempts to execute the Local Quality Gate.
+
+The Local Quality Gate runs applicable scanners, normalizes results, and generates reporting artifacts.
+
+The hook then prints the result or an advisory warning.
+
+Simplified flow:
 
 ```text
 git commit
@@ -71,99 +129,207 @@ git commit
 pre-commit hook
     |
     v
-run-local-checks.sh
+Local Quality Gate launcher
     |
-    +-- Checkstyle
+    +-- Java scanners
     |
-    +-- PMD
+    +-- Additional scanners
     |
-    +-- SpotBugs
+    +-- Normalization
+    |
+    +-- HTML and ZIP reporting
     |
     v
-Consolidated quality report
+Advisory result or warning
     |
     v
-Quality gate result
+Hook exits 0
     |
-    +-- Exit 0: Commit may proceed
-    |
-    +-- Exit 1: Commit blocked (violations)
-    |
-    +-- Exit 2: Commit blocked (execution error)
+    v
+Git continues commit processing
 ```
 
-The scanners execute even if an earlier scanner detects violations.
+Git may still reject the commit for reasons unrelated to this advisory hook.
 
-## 5. Exit Codes
+## 6. Exit Codes and Enforcement
 
-| Exit Code | Meaning | Commit Behavior |
-|---|---|---|
-| `0` | All quality checks passed | Commit may proceed |
-| `1` | One or more quality violations detected | Commit blocked |
-| `2` | Scanner execution or reporting error | Commit blocked |
+### 6.1 Java Scanner Wrapper Exit Codes
 
-The hook uses the overall exit status returned by the main quality-gate runner.
+The Java scanner wrappers use:
 
-A successful quality-gate result does not guarantee that Git will create the commit. Other Git checks or errors may still prevent it.
+| Exit code | Meaning |
+|---|---|
+| `0` | Analysis completed without findings |
+| `1` | Analysis completed with findings |
+| `2` | Scanner execution or report-validation error |
 
-## 6. Reports
+These are scanner-level outcomes, not Git commit decisions.
 
-The quality gate generates an HTML report at:
+### 6.2 Local Quality Gate Launcher
+
+The Local Quality Gate records scanner outcomes and generates a consolidated report.
+
+A successfully completed advisory reporting workflow may exit `0` even when findings or scanner execution errors were recorded.
+
+Infrastructure or reporting failures may produce nonzero launcher exit codes.
+
+Therefore, a launcher exit code of `0` does not guarantee that every scanner completed cleanly.
+
+### 6.3 Pre-Commit Hook
+
+The provided pre-commit hook:
+
+1. Checks whether the Local Quality Gate launcher exists.
+2. Prints a warning and exits `0` if the launcher is missing.
+3. Attempts to run the launcher when present.
+4. Prints a success message or warning based on the launcher result.
+5. Exits `0` after handling the result.
+
+The hook is intentionally advisory.
+
+Scanner findings and handled launcher failures do not block commits.
+
+## 7. Reports
+
+The Local Quality Gate generates an HTML report at:
 
 `quality/Local_Scans/reports/work/local-report.html`
 
-It also creates a timestamped ZIP archive under:
+It also generates normalized JSON and a timestamped ZIP archive under:
 
 `quality/Local_Scans/reports/`
 
-Generated reports and downloaded scanner distributions are excluded from Git.
+Reports provide more information than the hook's terminal message.
 
-## 7. Manual Execution
+Developers should review findings, disabled scanners, and execution errors before treating a scan as successful.
 
-Developers can run the quality gate without creating a commit.
+Generated reports and downloaded scanner distributions should remain excluded from version control.
 
-From the `backend/` directory:
+## 8. Manual Execution
+
+The Local Quality Gate can be executed without creating a Git commit.
+
+From the consuming repository root:
 
 ```bash
-sh ../quality/Local_Scans/run-local-checks.sh
+sh quality/Local_Scans/run-local-checks.sh
 ```
 
-This is useful when checking changes before staging or committing.
+Manual execution is useful before staging changes, creating commits, or opening pull requests.
 
-## 8. Emergency Bypass
+For Windows, the framework provides:
 
-Git provides a mechanism to bypass pre-commit hooks:
+```bat
+quality\Local_Scans\run-local-checks.bat
+```
+
+Windows execution remains unverified.
+
+## 9. Temporarily Skipping the Hook
+
+Git supports:
 
 ```bash
 git commit --no-verify
 ```
 
-This skips the configured local pre-commit hook.
+This skips the pre-commit hook.
 
-It should be reserved for exceptional circumstances and should not be part of the normal development workflow.
+Because the provided Local Quality Gate hook is advisory, skipping it is not necessary to bypass scanner findings.
 
-**Important:** The CI Quality Gate is implemented separately in GitHub Actions. Bypassing BN1 skips local checks, but does not skip CI.
+Using `--no-verify` also skips other applicable Git hooks, so it should not be used routinely.
 
-## 9. Relationship to the CI Quality Gate
+Skipping the local hook does not disable GitHub Actions or the CI Quality Gate.
 
-BN1 runs advisory local checks before commits. The CI Quality Gate is implemented in GitHub Actions, with policy-driven evaluation and successful PR/main workflow runs #19 and #20. Required checks depend on GitHub branch protection/rulesets.
+## 10. Removing the Hook Configuration
 
-The pre-commit hook does not block commits, even when scanner findings or execution errors are reported.
-
-## 10. Verified Behavior
-
-The hook ran during actual Git commit `40760b9` on 2026-11-17: seven scanners clean, two disabled, zero findings and zero errors. A later commit proceeded despite a TruffleHog Docker execution error, consistent with advisory behavior. After starting Docker, the full BN1 run completed cleanly.
-
-## 11. Current Status
-
-The BN1 hook is implemented and verified in real Git commits. It is advisory, not blocking. Cross-platform and fresh-environment verification remain outstanding.
-
-To install from the repository root:
+To remove the repository-local hook-path setting:
 
 ```bash
-git config --local core.hooksPath quality/Local_Scans/hooks
-chmod +x quality/Local_Scans/hooks/pre-commit
+git config --local --unset core.hooksPath
+```
+
+This removes the local override.
+
+Git then uses its normal configuration precedence to determine the effective hook directory.
+
+If another configuration source defines `core.hooksPath`, that setting may remain effective.
+
+Verify the result with:
+
+```bash
 git config --show-origin --get core.hooksPath
 ```
 
-Start Docker before running the gate.
+## 11. Relationship to the CI Quality Gate
+
+The Local Quality Gate and CI Quality Gate have different enforcement responsibilities.
+
+| Component | Execution context | Enforcement |
+|---|---|---|
+| Local Quality Gate | Developer workstation | Advisory |
+| Pre-commit hook | Local Git commit | Advisory |
+| CI Quality Gate | GitHub Actions | Policy-driven |
+
+The CI Quality Gate evaluates results according to its configured policy.
+
+Whether GitHub requires a passing CI check before merging depends on repository branch protection or ruleset configuration.
+
+The local hook does not replace CI validation.
+
+See `quality/CI/README.md`.
+
+## 12. Troubleshooting
+
+### Hook Does Not Execute
+
+Verify that:
+
+- `core.hooksPath` points to the expected directory.
+- The `pre-commit` file exists.
+- The hook is executable in the current environment.
+- The commit command is being executed in the intended repository.
+
+### Local Quality Gate Launcher Is Missing
+
+The hook prints a warning and allows Git to continue.
+
+Verify that the complete `quality/` framework was installed.
+
+### Scanner Execution Fails
+
+Review the terminal output and generated reports.
+
+Check scanner dependencies, project configuration, Java, Python, Maven, Docker, and network availability as applicable.
+
+### Commit Proceeds Despite Findings
+
+This is expected behavior.
+
+The Local Quality Gate is advisory and does not block commits because of scanner findings.
+
+### Existing Hooks Stop Running
+
+Inspect the effective `core.hooksPath` configuration.
+
+Git may now be using the Quality Gates hook directory instead of the previous hook directory.
+
+Restore or integrate existing hooks as appropriate.
+
+## 13. Portability Status
+
+The pre-commit hook has been exercised in its original host repository.
+
+Independent host-repository integration remains unverified.
+
+Windows execution and fresh-environment installation also remain unverified.
+
+Do not assume that installing the hook guarantees every scanner can execute successfully.
+
+## 14. Related Documentation
+
+- `quality/Local_Scans/README.md` — Local Quality Gate overview
+- `quality/Local_Scans/checks/checks_README.md` — Scanner wrappers
+- `quality/Local_Scans/reporting/report_README.md` — Reporting
+- `quality/CI/README.md` — CI Quality Gate
+- `quality/PORTABILITY.md` — Cross-project integration

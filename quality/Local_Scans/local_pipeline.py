@@ -1,8 +1,8 @@
 
-"""Integrate the nine EPMS BN1 scanners.
+"""Integrate the nine Local Quality Gate scanners.
 
 Preserve raw artifacts and use the CI normalization schema.
-BN1 remains advisory.
+The Local Quality Gate remains advisory.
 """
 
 import argparse
@@ -81,7 +81,7 @@ def integrate(
 
     # Stage raw scanner output outside the repository during
     # execution. This prevents scanning newly generated secrets.
-    with TemporaryDirectory(prefix="quality-bn1-") as temporary:
+    with TemporaryDirectory(prefix="quality-local-") as temporary:
         staging = Path(temporary)
 
         run_additional(repo_root, staging, tools_dir)
@@ -122,7 +122,7 @@ def integrate(
 
 
 def main():
-    """Run integration using the existing BN1 environment."""
+    """Run integration using the existing Local Quality Gate environment."""
     parser = argparse.ArgumentParser()
     parser.add_argument("repo_root", type=Path)
     parser.add_argument("work_dir", type=Path)

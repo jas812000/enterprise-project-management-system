@@ -1,7 +1,7 @@
 
 #!/bin/sh
 
-# EPMS Local Quality Gate — Advisory Pre-Commit Hook
+# Local Quality Gate — Advisory Pre-Commit Hook
 #
 # Runs local quality checks and reports findings.
 # Findings and scanner errors do not block Git commits.
@@ -31,5 +31,5 @@ else
   echo "Review the quality report for findings or execution errors." >&2
 fi
 
-# BN1 is advisory. Never block a commit.
+# The Local Quality Gate is advisory. Never block a commit.
 exit 0

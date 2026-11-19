@@ -1,4 +1,4 @@
-"""Regression tests for EPMS HTML quality-gate rendering."""
+"""Regression tests for Local Quality Gate HTML report rendering."""
 
 import unittest
 from quality.Local_Scans.reporting.report_parsers import empty_severity_counts

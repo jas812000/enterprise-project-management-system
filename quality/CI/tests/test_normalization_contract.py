@@ -1,4 +1,4 @@
-"""Contract tests for the EPMS CI quality-gate normalization layer."""
+"""Contract tests for the CI Quality Gate normalization layer."""
 
 import unittest
 
@@ -7,7 +7,7 @@ from quality.CI.gate.schemas import base_tool_result
 
 
 class NormalizationContractTests(unittest.TestCase):
-    """Regression tests for the corresponding EPMS quality component."""
+    """Regression tests for the corresponding CI Quality Gate component."""
 
     def test_all_twelve_scanners_are_registered(self):
         """Verify all twelve scanners are registered."""

@@ -1,5 +1,5 @@
 
-"""Run the EPMS Gitleaks filesystem scan."""
+"""Run the local Gitleaks filesystem scan."""
 
 import json
 import shutil

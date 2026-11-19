@@ -1,5 +1,5 @@
 
-"""Run Pylint and Bandit using the EPMS CI scan conventions."""
+"""Run Pylint and Bandit using the shared CI scan conventions."""
 
 import os
 import sys

@@ -1,4 +1,4 @@
-"""Unit tests for the EPMS PMD XML report parser."""
+"""Unit tests for the Local Quality Gate PMD XML report parser."""
 
 import tempfile
 import unittest

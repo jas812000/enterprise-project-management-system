@@ -1,5 +1,5 @@
 
-title = "EPMS Local Gitleaks Configuration"
+title = "Local Quality Gate Gitleaks Configuration"
 
 # Preserve the default Gitleaks detection rules.
 [extend]
