@@ -175,6 +175,36 @@
 
 	<build>
 		<plugins>
+			<!-- Execute database migrations independently of Spring Boot. -->
+			<plugin>
+				<groupId>org.flywaydb</groupId>
+				<artifactId>flyway-maven-plugin</artifactId>
+				<version>${flyway.version}</version>
+
+				<configuration>
+					<url>${env.EPMS_FLYWAY_URL}</url>
+					<user>${env.EPMS_FLYWAY_USERNAME}</user>
+					<password>${env.EPMS_FLYWAY_PASSWORD}</password>
+					<locations>
+						<location>filesystem:src/main/resources/db/migration</location>
+					</locations>
+					<validateOnMigrate>true</validateOnMigrate>
+					<baselineOnMigrate>false</baselineOnMigrate>
+				</configuration>
+
+				<dependencies>
+					<dependency>
+						<groupId>org.flywaydb</groupId>
+						<artifactId>flyway-database-postgresql</artifactId>
+						<version>${flyway.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.postgresql</groupId>
+						<artifactId>postgresql</artifactId>
+						<version>${postgresql.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
