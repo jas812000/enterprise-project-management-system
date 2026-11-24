@@ -53,6 +53,26 @@ class LocalLauncherTests(unittest.TestCase):
             self.assertNotIn("--- PMD ---", result.stdout)
             self.assertNotIn("--- SpotBugs ---", result.stdout)
 
+    def test_output_directory_defaults_outside_repository(self):
+        """Default report storage must be under the user's Downloads folder."""
+        source = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn('Downloads/quality-gates-reports/', source)
+        self.assertIn('QUALITY_OUTPUT_DIR', source)
+        self.assertNotIn('OUTPUT_DIR="${SCRIPT_DIR}/reports"', source)
+
+    def test_rejects_unsafe_output_before_scanners(self):
+        """Do not permit cleanup to target the repository or Downloads root."""
+        environment = os.environ.copy()
+        environment["QUALITY_OUTPUT_DIR"] = str(REPO_ROOT)
+        result = subprocess.run(  # nosec B603
+            [SHELL, str(LAUNCHER)], cwd=REPO_ROOT,
+            env=environment, capture_output=True, text=True,
+            check=False, timeout=30,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Unsafe local quality report output directory", result.stderr)
+        self.assertNotIn("--- Checkstyle ---", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

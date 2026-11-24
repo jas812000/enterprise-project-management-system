@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EPMS B18.22: narrowly scoped reviewed exceptions. Do not add blanket category exclusions. -->
+<FindBugsFilter>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.outage.PasswordScreeningOutage"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.outage.PasswordScreeningOutageRecorder"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Spring-managed dependency reference is intentionally shared; defensive copying breaks dependency injection. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AccountUnlockService"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AuthenticatedSessionValidationService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Spring-managed dependency reference is intentionally shared; defensive copying breaks dependency injection. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AuthenticationRateLimitCounterRepository"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-managed dependency reference is intentionally shared; defensive copying breaks dependency injection. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AuthenticationSecurityAuditService"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.DeferredClaimedRecoveryService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.DeferredCredentialScreeningService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.DeferredRecoveryBatchCoordinator"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.DeferredRecoveryClaimService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.DeferredRecoveryScheduler"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.EpmsUserDetailsService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.ProvisionalCredentialIssuer"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.web.AuthenticatedSessionValidationFilter"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.web.EpmsAuthenticationFailureHandler"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.user.entity.UserCredential"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.user.service.UserCredentialFailureWriter"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Constructor input validation or dependency wiring; no publication of this before validation. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.user.service.UserCredentialService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Spring dependency validation before construction completes; no this escape. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.rbac.RbacAdministrationService"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- Shared Spring-managed collaborators; copying would violate dependency injection. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.rbac.RbacAdministrationService"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- QG-3: Constructor validates injected JDBC dependency before publication; no this escape. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AuthenticationTokenDatabaseAdapter"/>
+    <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+  </Match>
+  <!-- QG-3: JdbcTemplate is an intentionally shared Spring-managed collaborator, not owned mutable data. -->
+  <Match>
+    <Class name="com.jamesstevens.epms.security.service.AuthenticationTokenDatabaseAdapter"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+</FindBugsFilter>

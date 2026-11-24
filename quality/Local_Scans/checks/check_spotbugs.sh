@@ -148,6 +148,7 @@ SPOTBUGS_EXIT=0
   -exitcode \
   -xml:withMessages \
   -effort:max \
+  -exclude "${REPO_ROOT}/quality/Local_Scans/checks/spotbugs-exclusions.xml" \
   -auxclasspath "$(cat "${CLASSPATH_FILE}")" \
   -output "${OUT}" \
   "${CLASSES}" || SPOTBUGS_EXIT=$?
@@ -219,6 +220,26 @@ if [ "${COUNT}" -gt 0 ]; then
   echo "SpotBugs completed. ${COUNT} findings detected."
   exit 1
 fi
+
+
+# B18.28: detect new or changed findings even when the class-scoped filter hides them.
+UNFILTERED="${WORK_DIR}/spotbugs-unfiltered-baseline.xml"
+BASELINE="${REPO_ROOT}/quality/Local_Scans/checks/spotbugs-approved-baseline.json"
+CHECKER="${REPO_ROOT}/quality/Local_Scans/checks/verify_spotbugs_baseline.py"
+UNFILTERED_EXIT=0
+"${SPOTBUGS_DIR}/bin/spotbugs" \
+  -textui \
+  -xml:withMessages \
+  -effort:max \
+  -auxclasspath "$(cat "${CLASSPATH_FILE}")" \
+  -output "${UNFILTERED}" \
+  "${CLASSES}" || UNFILTERED_EXIT=$?
+case "${UNFILTERED_EXIT}" in
+  0|1|4) ;;
+  *) error "Unfiltered SpotBugs execution failed (exit ${UNFILTERED_EXIT})." ;;
+esac
+python3 "${CHECKER}" "${UNFILTERED}" "${BASELINE}" ||
+  error "SpotBugs approved baseline changed. Review and explicitly approve findings before updating baseline."
 
 echo "SpotBugs passed. No findings found."
 exit 0
