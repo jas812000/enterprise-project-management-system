@@ -1,5 +1,6 @@
 package com.jamesstevens.epms.security.service;
 
+import java.io.Serial;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,6 +29,7 @@ public final class PwnedPasswordScreeningService {
         String fetch(String fiveCharacterPrefix) throws Exception;
     }
     public static final class ScreeningUnavailableException extends RuntimeException {
+        @Serial
         private static final long serialVersionUID = 1L;
         public ScreeningUnavailableException(Throwable cause) { super("Password screening unavailable", cause); }
     }
@@ -60,13 +62,17 @@ public final class PwnedPasswordScreeningService {
 
     public Result screen(String normalizedPassword) {
         Objects.requireNonNull(normalizedPassword, "normalizedPassword");
+
         try {
+            // SHA-1 is required by the HIBP Pwned Passwords range API.
+            // This digest is used for breach screening, not password storage.
+            // nosemgrep: java.lang.security.audit.crypto.use-of-sha1.use-of-sha1
             byte[] digest = MessageDigest.getInstance("SHA-1").digest(
                     normalizedPassword.getBytes(StandardCharsets.UTF_8));
+
             String hex = HexFormat.of().withUpperCase().formatHex(digest);
             return screenDigest(hex);
-        } catch (ScreeningUnavailableException unavailable) {
-            throw unavailable;
+
         } catch (NoSuchAlgorithmException exception) {
             throw new ScreeningUnavailableException(exception);
         }

@@ -24,7 +24,7 @@ CATEGORY_FIELDS = {
 COVERAGE_CATEGORIES = {
     "vuln": "Vulnerabilities",
     "misconfig": "Misconfigurations",
-    "secret": "Secrets",
+    "secret": "Secrets",  # nosec B105 - Trivy scanner category, not a credential
 }
 
 
