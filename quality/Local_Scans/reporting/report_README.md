@@ -4,7 +4,7 @@
 
 The `quality/Local_Scans/reporting/` directory contains the Python reporting components for the Local Quality Gate.
 
-The reporting workflow consolidates results from nine registered scanners into a normalized JSON document and an HTML report.
+The reporting workflow consolidates results from ten registered scanners into a normalized JSON document and an HTML report.
 
 The Local Quality Gate is advisory.
 
@@ -14,7 +14,7 @@ The reporting engine is invoked by the main Local Quality Gate launcher.
 
 ## 2. Reporting Architecture
 
-The Local Quality Gate coordinates nine scanners:
+The Local Quality Gate coordinates ten scanners:
 
 | Scanner | Category |
 |---|---|
@@ -124,14 +124,14 @@ It copies the normalized document to:
 
 The working-directory copy is consumed by the HTML report generator and included in the ZIP archive.
 
-The normalized document contains results for nine registered scanners.
+The normalized document contains results for ten registered scanners.
 
 The HTML generator validates that:
 
 1. The document is a JSON object.
 2. `tool_count` equals `9`.
 3. `results` is a list.
-4. The results list contains nine entries.
+4. The results list contains ten entries.
 
 If the normalized document is missing or structurally invalid, the HTML generator prints a warning and may render without normalized data.
 
@@ -371,3 +371,5 @@ Do not treat successful report generation as proof that all registered scanners 
 - `quality/CI/README.md` — CI Quality Gate
 - `quality/PORTABILITY.md` — Cross-project integration
 - `quality/project.example.json` — Project configuration template
+
+Trivy requires the `trivy` executable on PATH and scans filesystem vulnerabilities, misconfigurations and secrets. Missing or invalid execution is an error.

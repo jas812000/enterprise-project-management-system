@@ -12,7 +12,7 @@ Three shell wrappers execute Java static-analysis tools:
 
 Additional scanner components support Pylint, Bandit, Gitleaks, TruffleHog, HTMLHint, and Stylelint.
 
-The Local Quality Gate registers nine scanners in total.
+The Local Quality Gate registers ten scanners in total.
 
 The main launcher coordinates execution, collects scanner outcomes, normalizes results, and generates consolidated reports.
 
@@ -254,3 +254,5 @@ Do not interpret successful configuration loading as proof that every scanner ca
 - `quality/CI/README.md` — CI Quality Gate
 - `quality/PORTABILITY.md` — Cross-project integration
 - `quality/project.example.json` — Project configuration template
+
+Trivy requires the `trivy` executable on PATH and scans filesystem vulnerabilities, misconfigurations and secrets. Missing or invalid execution is an error.

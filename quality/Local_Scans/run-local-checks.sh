@@ -241,7 +241,7 @@ esac
 
 
 # ----------------------------------------------------------
-# Run additional scanners and normalize all nine results
+# Run additional scanners and normalize all ten results
 # ----------------------------------------------------------
 echo ""
 
@@ -328,6 +328,7 @@ with zipfile.ZipFile(zip_path, "r") as archive:
         "gitleaks.json",
         "bandit.json",
         "pylint.json",
+        "trivy.json",
     }
 
     for name in names:
@@ -356,7 +357,7 @@ run_python "${REPORT_DIR}/open_report.py"
 
 
 # ----------------------------------------------------------
-# Final Local Quality Gate summary — all nine scanners
+# Final Local Quality Gate summary — all ten scanners
 # ----------------------------------------------------------
 echo ""
 echo "=========================================="
@@ -380,6 +381,7 @@ scanner_names = (
     "bandit",
     "htmlhint",
     "stylelint",
+    "trivy",
 )
 
 try:

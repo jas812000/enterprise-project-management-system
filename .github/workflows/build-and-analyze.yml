@@ -1075,63 +1075,13 @@ jobs:
           fi
 
           if [[ "${TRIVY_EXIT}" -eq 0 ]]; then
-            "${TOOL_DIR}/trivy" fs \
-              "${RESOLVED_ROOT}" \
-              --format json \
-              --output "${OUT}" \
-              --exit-code 0 \
-              --scanners vuln \
-              --ignore-unfixed \
-              || TRIVY_EXIT=$?
-          fi
-
-          echo "Trivy exit code: ${TRIVY_EXIT}"
-
-          if [[ "${TRIVY_EXIT}" -eq 0 ]] \
-            && [[ -s "${OUT}" ]] \
-            && python3 - "${OUT}" <<'PY'
-          import json
+            PATH="${TOOL_DIR}:${PATH}" python3 - "${RESOLVED_ROOT}" "$(dirname "${OUT}")" <<'PY'
           import sys
-
-          try:
-              with open(sys.argv[1], encoding="utf-8") as report:
-                  data = json.load(report)
-
-              valid = (
-                  isinstance(data, dict)
-                  and isinstance(data.get("Results"), list)
-                  and all(
-                      isinstance(item, dict)
-                      and isinstance(item.get("Target"), str)
-                      and (
-                          item.get("Vulnerabilities") is None
-                          or (
-                              isinstance(item["Vulnerabilities"], list)
-                              and all(
-                                  isinstance(vulnerability, dict)
-                                  for vulnerability in item["Vulnerabilities"]
-                              )
-                          )
-                      )
-                      for item in data["Results"]
-                  )
-              )
-          except (OSError, ValueError, TypeError):
-              valid = False
-
-          sys.exit(0 if valid else 1)
+          from quality.Local_Scans.checks.check_trivy import run
+          run(sys.argv[1], sys.argv[2])
           PY
-          then
-            printf '{"status":"completed","exit_code":0}\n' \
-              > "${STATUS}"
-            echo "Trivy completed successfully."
           else
-            rm -f "${OUT}"
-
-            printf '{"status":"failed","exit_code":%d,"reason":"Trivy installation, execution, or report validation failed"}\n' \
-              "${TRIVY_EXIT}" > "${STATUS}"
-
-            echo "::error::Trivy installation, execution, or report validation failed."
+            printf '{"status":"failed","reason":"Trivy installation failed"}\n' > "${STATUS}"
           fi
 
       # ------------------------------------------------------

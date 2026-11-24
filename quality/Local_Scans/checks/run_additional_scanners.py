@@ -1,5 +1,5 @@
 
-"""Execute the six additional Local Quality Gate scanners.
+"""Execute the seven additional Local Quality Gate scanners.
 
 Raw artifacts are stored outside the repository and report ZIP.
 """
@@ -14,6 +14,7 @@ from quality.Local_Scans.checks import (
     check_python_scanners,
     check_stylelint,
     check_trufflehog,
+    check_trivy,
 )
 
 
@@ -27,6 +28,7 @@ def run(repo_root: Path, raw_dir: Path, tools_dir: Path) -> None:
         (("htmlhint",), lambda: check_htmlhint.run(repo_root, raw_dir)),
         (("stylelint",), lambda: check_stylelint.run(repo_root, raw_dir, tools_dir)),
         (("gitleaks",), lambda: check_gitleaks.run(repo_root, raw_dir)),
+        (("trivy",), lambda: check_trivy.run(repo_root, raw_dir)),
         (("trufflehog",), lambda: check_trufflehog.run(repo_root, raw_dir)),
     )
 

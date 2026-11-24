@@ -1,4 +1,4 @@
-"""Build nine-scanner sections for the Local Quality Gate advisory report."""
+"""Build ten-scanner sections for the Local Quality Gate advisory report."""
 
 from html import escape
 
@@ -131,7 +131,7 @@ def tool_section(
 
 
 def build_summary_table(context: dict) -> str:
-    """Render the nine-scanner summary table."""
+    """Render the ten-scanner summary table."""
     rows = []
 
     for result in _scanner_rows(context):
@@ -167,7 +167,7 @@ def build_summary_table(context: dict) -> str:
 
 
 def build_sections(context: dict) -> str:
-    """Render all nine normalized scanner sections."""
+    """Render all ten normalized scanner sections."""
     sections = []
 
     for result in _scanner_rows(context):

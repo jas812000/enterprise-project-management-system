@@ -1,8 +1,8 @@
 """Small, scanner-neutral helpers for reading JSON artifacts."""
 
 import json
-
 from pathlib import Path
+from typing import Any
 
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
@@ -19,16 +19,30 @@ def prepare_artifact(result: dict, artifact: Path) -> bool:
 
     The owning parser retains responsibility for handling parse errors.
     """
-    if not artifact.exists():
+    if not artifact.is_file():
         result["artifact_present"] = False
         result["runtime_error"] = True
         return False
+
     result["artifact_present"] = True
     result["executed"] = True
     return True
 
 
-def record_findings(result: dict, findings: list[dict], max_severity: str) -> None:
+def load_json_artifact(artifact: Path) -> Any:
+    """Load a JSON scanner artifact using UTF-8 encoding.
+
+    The owning parser retains responsibility for handling parse errors.
+    """
+    with artifact.open(encoding="utf-8") as file_handle:
+        return json.load(file_handle)
+
+
+def record_findings(
+    result: dict,
+    findings: list[dict],
+    max_severity: str,
+) -> None:
     """Store a scanner's normalized findings and calculated severity.
 
     Scanner-specific severity mapping and maximum-severity calculation

@@ -54,12 +54,13 @@ class AdditionalScannerTests(unittest.TestCase):
                     "run_additional_scanners."
                     "check_trufflehog.run"
                 ),
+                patch("quality.Local_Scans.checks.run_additional_scanners.check_trivy.run"),
             ):
                 run(repo, raw, tools)
 
             for name in (
                 "pylint", "bandit", "htmlhint",
-                "stylelint", "gitleaks", "trufflehog",
+                "stylelint", "gitleaks", "trufflehog", "trivy",
             ):
                 status_path = raw / f"{name}.status.json"
                 self.assertTrue(status_path.exists())

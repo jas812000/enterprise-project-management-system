@@ -18,7 +18,7 @@ from quality.Local_Scans.scanner_registry import LOCAL_SCANNERS
 
 
 def normalize_local(raw_dir: Path, output_file: Path) -> dict:
-    """Collect nine scanner results without enforcing CI policy."""
+    """Collect ten scanner results without enforcing CI policy."""
     raw_dir = Path(raw_dir)
     output_file = Path(output_file)
 
@@ -113,7 +113,7 @@ def format_scanner_outcome(result: dict) -> str:
     display = {
         "pylint": "Pylint", "bandit": "Bandit",
         "htmlhint": "HTMLHint", "stylelint": "Stylelint",
-        "gitleaks": "Gitleaks", "trufflehog": "TruffleHog",
+        "trivy": "Trivy", "gitleaks": "Gitleaks", "trufflehog": "TruffleHog",
     }.get(name, name)
     status = result.get("metadata", {}).get("status", "failed")
     count = result.get("violation_count", 0)

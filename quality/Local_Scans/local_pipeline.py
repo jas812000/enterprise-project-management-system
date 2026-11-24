@@ -1,5 +1,5 @@
 
-"""Integrate the nine Local Quality Gate scanners.
+"""Integrate the ten Local Quality Gate scanners.
 
 Preserve raw artifacts and use the CI normalization schema.
 The Local Quality Gate remains advisory.
@@ -62,7 +62,7 @@ def integrate(
     tools_dir: Path,
     java_statuses: dict,
 ) -> dict:
-    """Run six scanners and combine them with Java results."""
+    """Run seven scanners and combine them with Java results."""
     repo_root = repo_root.resolve()
     work_dir = work_dir.resolve()
     reports_dir = reports_dir.resolve()
@@ -94,7 +94,7 @@ def integrate(
         # Report actual normalized outcomes, not merely execution completion.
         additional = {
             "pylint", "bandit", "htmlhint", "stylelint",
-            "gitleaks", "trufflehog",
+            "gitleaks", "trufflehog", "trivy",
         }
         for result in document["results"]:
             if result["tool"] in additional:
@@ -105,6 +105,7 @@ def integrate(
                     "stylelint": "Stylelint",
                     "gitleaks": "Gitleaks",
                     "trufflehog": "TruffleHog",
+                    "trivy": "Trivy",
                 }[result["tool"]]
                 print(f"\n--- {display_name} ---", flush=True)
                 print(format_scanner_outcome(result), flush=True)
