@@ -1,9 +1,13 @@
 package com.jamesstevens.epms.common.exception;
 
+import com.jamesstevens.epms.security.web.AuthenticatedSessionValidationFilter;
+import com.jamesstevens.epms.security.web.AuthenticationRateLimitFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +30,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Uses a test-only controller and disables security filters
  * to isolate exception-handling behavior.</p>
  */
-@WebMvcTest
+@WebMvcTest(
+        controllers = GlobalExceptionHandlerMvcTest.TestController.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = {AuthenticatedSessionValidationFilter.class, AuthenticationRateLimitFilter.class}
+        )
+)
 @Import({
         GlobalExceptionHandler.class,
         GlobalExceptionHandlerMvcTest.TestController.class

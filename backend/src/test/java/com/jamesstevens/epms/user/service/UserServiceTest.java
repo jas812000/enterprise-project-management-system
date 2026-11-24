@@ -41,7 +41,8 @@ class UserServiceTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer postgres =
-            new PostgreSQLContainer("postgres:18");
+            new PostgreSQLContainer("postgres:18")
+                    .withInitScript("test-db-init.sql");
 
     @Autowired
     private UserService userService;

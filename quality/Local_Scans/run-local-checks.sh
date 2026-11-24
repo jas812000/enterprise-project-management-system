@@ -24,9 +24,30 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 CHECKS_DIR="${SCRIPT_DIR}/checks"
 REPORT_DIR="${SCRIPT_DIR}/reporting"
 TOOLS_DIR="${SCRIPT_DIR}/tools"
-OUTPUT_DIR="${SCRIPT_DIR}/reports"
+# Keep local generated artifacts outside the source tree. CI artifacts remain
+# managed by GitHub Actions and are unaffected by this local launcher setting.
+# QUALITY_OUTPUT_DIR allows portable, explicit output selection.
+if [ -n "${QUALITY_OUTPUT_DIR:-}" ]; then
+  OUTPUT_DIR="${QUALITY_OUTPUT_DIR}"
+else
+  OUTPUT_DIR="${HOME:?HOME must be set}/Downloads/quality-gates-reports/$(basename "${REPO_ROOT}")"
+fi
 
-# Store generated scan artifacts inside the host repository.
+# Never delete from a repository path or from a broad filesystem root.
+# The only cleanup target below is a dedicated child named 'work'.
+case "${OUTPUT_DIR}" in
+  *"/../"*|*"/./"*|*"/.."|*"/."|*"//"*)
+    echo "ERROR: Unsafe local quality report output directory: ${OUTPUT_DIR}" >&2
+    exit 2
+    ;;
+  "${HOME}/Downloads/"*)
+    ;;
+  *)
+    echo "ERROR: Unsafe local quality report output directory: ${OUTPUT_DIR}" >&2
+    exit 2
+    ;;
+esac
+
 if ! mkdir -p "${OUTPUT_DIR}"; then
   echo "ERROR: Cannot create quality reports directory: ${OUTPUT_DIR}" >&2
   exit 2
@@ -100,13 +121,17 @@ if ! mkdir -p "${WORK_DIR}"; then
   exit 2
 fi
 
-# Remove generated files from the previous scan.
-if ! run_python - "${WORK_DIR}" <<'PY'
+# Remove generated files from the previous scan only after verifying that
+# the work directory is a real child of the configured output directory.
+if ! run_python - "${OUTPUT_DIR}" "${WORK_DIR}" <<'PY'
 from pathlib import Path
 import shutil
 import sys
 
-work_dir = Path(sys.argv[1])
+output_dir = Path(sys.argv[1]).resolve(strict=True)
+work_dir = Path(sys.argv[2])
+if work_dir.is_symlink() or work_dir.resolve(strict=True).parent != output_dir:
+    raise SystemExit("Unsafe scanner work directory; refusing cleanup")
 
 for item in work_dir.iterdir():
     if item.is_dir() and not item.is_symlink():

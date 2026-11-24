@@ -24,7 +24,8 @@ class OrganizationServiceTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer postgres =
-            new PostgreSQLContainer("postgres:18");
+            new PostgreSQLContainer("postgres:18")
+                    .withInitScript("test-db-init.sql");
 
     @Autowired
     private OrganizationService organizationService;

@@ -192,7 +192,8 @@ The `tools/` and `reports/` directories contain downloaded dependencies or gener
 From the host repository root:
 
 ```bash
-sh quality/Local_Scans/run-local-checks.sh
+
+
 ```
 
 The launcher:

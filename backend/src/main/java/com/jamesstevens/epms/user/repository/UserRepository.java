@@ -79,4 +79,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             UUID userId,
             UUID organizationId
     );
+
+    /**
+     * Finds an EPMS user by email, ignoring letter case.
+     *
+     * <p>EPMS has one organization per installation.
+     *
+     * @param email login email address
+     * @return matching user, if present
+     */
+    Optional<User> findByEmailIgnoreCase(String email);
 }

@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "spotbugs_version": "4.10.5",
+  "findings": [
+    {
+      "class": "com.jamesstevens.epms.security.outage.PasswordScreeningOutage",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "b8f3d2480a28b975fe13fdf52c1fd75a"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.outage.PasswordScreeningOutageRecorder",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "24c98eadd7936a3faa3c389c30c52100"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.outage.PasswordScreeningOutageRecorder",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "39a78895ae510acb8eda8b7ba3f0e35b"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.rbac.RbacAdministrationService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "1bc04543dfc36660d134dd55a7c98c66"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.rbac.RbacAdministrationService",
+      "type": "EI_EXPOSE_REP2",
+      "instanceHash": "e79551ea332b382a571c867de0d3fff7"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AccountUnlockService",
+      "type": "EI_EXPOSE_REP2",
+      "instanceHash": "d1ce4e5da98c248fa61df93b53f5bd2f"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AuthenticatedSessionValidationService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "cd61b4218ad83a297ed813fba07fbe10"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AuthenticationRateLimitCounterRepository",
+      "type": "EI_EXPOSE_REP2",
+      "instanceHash": "fc68ac5af90fbb8a1a19e4dba9a1b0a4"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AuthenticationSecurityAuditService",
+      "type": "EI_EXPOSE_REP2",
+      "instanceHash": "1ebc583eaa857e80cf4e6f38f90128a4"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AuthenticationTokenDatabaseAdapter",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "b05533f359b562a249780c75d98f0880"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.AuthenticationTokenDatabaseAdapter",
+      "type": "EI_EXPOSE_REP2",
+      "instanceHash": "ded6f515737699a051db10842819e02b"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredClaimedRecoveryService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "74ff9696b52e872d7700d6b13ba72903"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredClaimedRecoveryService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "f5eed47919a7d1498ecfb44c26312abb"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredCredentialScreeningService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "12d4c6532d8b72217723b7956306da17"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredCredentialScreeningService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "d56dfb424ac7e3f6b01a93bbbdfa7cdb"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredRecoveryBatchCoordinator",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "e2c78084168fa4378528a8a53847af05"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredRecoveryClaimService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "7d1729cbdb20ed16854b2d5408bc9492"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredRecoveryClaimService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "8a45e1fb0a19b048ce6f7cd0e8d85fb8"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.DeferredRecoveryScheduler",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "b899a5156f76ba1b50adb0e05bae5e1a"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.EpmsUserDetailsService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "5724cf4175e300ec087fd5b7ab5daab9"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.ProvisionalCredentialIssuer",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "3912d96776895d2e677c3f1e10c8d187"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.service.ProvisionalCredentialIssuer",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "e4388e66e2588accddd93155ed0e311c"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.web.AuthenticatedSessionValidationFilter",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "2d3d18d0747fe2cbb169a78ee91d1596"
+    },
+    {
+      "class": "com.jamesstevens.epms.security.web.EpmsAuthenticationFailureHandler",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "4348981df494d9f1b259656d181b255b"
+    },
+    {
+      "class": "com.jamesstevens.epms.user.entity.UserCredential",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "24ff69091c05db678fdb910c3af59333"
+    },
+    {
+      "class": "com.jamesstevens.epms.user.service.UserCredentialFailureWriter",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "2178f399ec474eb28fffb4feead17dca"
+    },
+    {
+      "class": "com.jamesstevens.epms.user.service.UserCredentialService",
+      "type": "CT_CONSTRUCTOR_THROW",
+      "instanceHash": "ce40258c98a71f89e0d2934e4b96220f"
+    }
+  ]
+}
