@@ -50,18 +50,20 @@ severity. The actual severity is stored in the "severity" field of
 each warning object.
 """
 
-import json
 from pathlib import Path
-
+from quality.shared.artifact_io import (
+    load_json_artifact,
+    prepare_artifact,
+    record_findings,
+)
 from quality.CI.gate.schemas import base_tool_result
-from quality.CI.gate.utils import determine_max_severity
+from ..utils import determine_max_severity
 
 
 SEVERITY_MAP = {
     "error": "high",
     "warning": "medium",
 }
-
 
 def parse_stylelint(raw_dir: Path) -> dict:
     """
@@ -88,17 +90,11 @@ def parse_stylelint(raw_dir: Path) -> dict:
     result = base_tool_result("stylelint")
     artifact = raw_dir / "stylelint.json"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"] = True
+    if not prepare_artifact(result, artifact):
         return result
 
-    result["artifact_present"] = True
-    result["executed"] = True
-
     try:
-        with open(artifact, "r", encoding="utf-8") as file_handle:
-            data = json.load(file_handle)
+        data = load_json_artifact(artifact)
 
         file_results = data if isinstance(data, list) else []
         findings = []
@@ -125,9 +121,11 @@ def parse_stylelint(raw_dir: Path) -> dict:
                     }
                 )
 
-        result["findings"] = findings
-        result["violation_count"] = len(findings)
-        result["max_severity"] = determine_max_severity(result["severity_counts"])
+        record_findings(
+            result,
+            findings,
+            determine_max_severity(result["severity_counts"]),
+        )
 
     except (OSError, TypeError, ValueError, KeyError) as error:
         result["runtime_error"] = True

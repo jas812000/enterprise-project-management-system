@@ -24,7 +24,7 @@ The hook invokes:
 
 `quality/Local_Scans/run-local-checks.sh`
 
-The Local Quality Gate coordinates nine registered scanners:
+The Local Quality Gate coordinates ten registered scanners:
 
 - Checkstyle
 - PMD
@@ -333,3 +333,5 @@ Do not assume that installing the hook guarantees every scanner can execute succ
 - `quality/Local_Scans/reporting/report_README.md` — Reporting
 - `quality/CI/README.md` — CI Quality Gate
 - `quality/PORTABILITY.md` — Cross-project integration
+
+Trivy requires the `trivy` executable on PATH and scans filesystem vulnerabilities, misconfigurations and secrets. Missing or invalid execution is an error.

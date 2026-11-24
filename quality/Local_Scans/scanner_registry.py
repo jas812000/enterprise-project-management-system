@@ -4,7 +4,7 @@
 from quality.CI.gate.normalize import TOOL_PARSERS
 from quality.CI.gate.scanner_artifacts import SCANNER_ARTIFACTS
 
-# The Local Quality Gate uses nine of the twelve CI Quality Gate scanners.
+# The Local Quality Gate uses ten of the twelve CI Quality Gate scanners.
 LOCAL_SCANNER_NAMES = (
     "trufflehog",
     "gitleaks",
@@ -15,6 +15,7 @@ LOCAL_SCANNER_NAMES = (
     "bandit",
     "htmlhint",
     "stylelint",
+    "trivy",
 )
 
 # Reuse the CI parsers rather than maintaining local copies.

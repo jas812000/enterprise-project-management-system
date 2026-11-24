@@ -177,6 +177,6 @@ tools:
   # ----------------------------------------------------------
   trivy:
     blocking: true
-    description: "Trivy container and filesystem vulnerability scan"
+    description: "Trivy filesystem vulnerability, misconfiguration and secret scan"
     fail_on:
       severity: "medium_and_above"

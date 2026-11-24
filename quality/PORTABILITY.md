@@ -493,7 +493,7 @@ Windows execution remains unverified.
 
 ### 9.3 Review Scanner Results
 
-The Local Quality Gate reports nine scanner records.
+The Local Quality Gate reports ten scanner records.
 
 Possible outcomes include:
 
@@ -699,7 +699,7 @@ Check that exported paths match the intended source and build directories.
 
 Run the Local Quality Gate.
 
-Verify that all nine scanner records appear in the final normalized results.
+Verify that all ten scanner records appear in the final normalized results.
 
 Review the status of every scanner.
 
@@ -850,3 +850,5 @@ These limitations should be resolved or explicitly documented before publishing 
 - `quality/CI/gate/policy.yaml` — CI enforcement policy
 - `quality/project.example.json` — Configuration template
 - `quality/project_config.py` — Configuration validation
+
+Trivy requires the `trivy` executable on PATH and scans filesystem vulnerabilities, misconfigurations and secrets. Missing or invalid execution is an error.

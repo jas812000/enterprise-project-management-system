@@ -45,7 +45,7 @@ class LocalPipelineTests(unittest.TestCase):
                 """Set up the test fixture."""
                 for name in (
                     "pylint", "bandit", "htmlhint",
-                    "stylelint", "gitleaks", "trufflehog",
+                    "stylelint", "gitleaks", "trufflehog", "trivy",
                 ):
                     (raw / f"{name}.status.json").write_text(
                         json.dumps({
@@ -72,7 +72,7 @@ class LocalPipelineTests(unittest.TestCase):
                     },
                 )
 
-            self.assertEqual(document["tool_count"], 9)
+            self.assertEqual(document["tool_count"], 10)
             self.assertEqual(document["mode"], "advisory")
 
             self.assertTrue(

@@ -3,7 +3,7 @@
 Generate the Local Quality Gate HTML report.
 
 Reads the existing Java scanner reports and the normalized
-nine-scanner results produced by the local pipeline.
+ten-scanner results produced by the local pipeline.
 
 Builds the HTML report through report_html.py.
 
@@ -93,7 +93,7 @@ def main() -> None:
 
 
     # ----------------------------------------------------------
-    # Load normalized nine-scanner results
+    # Load normalized ten-scanner results
     # ----------------------------------------------------------
     normalized = None
 
@@ -107,9 +107,9 @@ def main() -> None:
                     "Normalized report must contain a JSON object."
                 )
 
-            if normalized.get("tool_count") != 9:
+            if normalized.get("tool_count") != 10:
                 raise ValueError(
-                    "Normalized report must contain nine scanners."
+                    "Normalized report must contain ten scanners."
                 )
 
             if not isinstance(normalized.get("results"), list):
@@ -117,7 +117,7 @@ def main() -> None:
                     "Normalized report is missing scanner results."
                 )
 
-            if len(normalized["results"]) != 9:
+            if len(normalized["results"]) != 10:
                 raise ValueError(
                     "Normalized report has an incorrect result count."
                 )
@@ -161,7 +161,7 @@ def main() -> None:
         "pmd_sev": pmd_sev,
         "sb_sev": sb_sev,
 
-        # All nine scanners, normalized using CI Quality Gate parsers
+        # All ten scanners, normalized using CI Quality Gate parsers
         "normalized": normalized,
 
         # The Local Quality Gate does not enforce quality thresholds

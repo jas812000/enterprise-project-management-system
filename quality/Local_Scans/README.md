@@ -12,7 +12,7 @@ For instructions on integrating Quality Gates into another repository, see [Proj
 
 ## 2. Supported Scanners
 
-Nine scanners are registered.
+Ten scanners are registered.
 
 | Scanner    | Purpose                                  |
 |------------|------------------------------------------|
@@ -210,7 +210,7 @@ The launcher:
 10. Attempts to open the HTML report.
 11. Prints the final advisory scanner summary.
 
-The scanner registry defines the nine supported scanner names.
+The scanner registry defines the ten supported scanner names.
 
 Scanner execution errors and findings are reported separately.
 
@@ -349,7 +349,7 @@ Quality Gates has two execution contexts.
 | Capability           | Local Quality Gate                        | CI Quality Gate                                      |
 |----------------------|-------------------------------------------|------------------------------------------------------|
 | Primary execution    | Developer machine                         | GitHub Actions                                       |
-| Scanner inventory    | Nine registered scanners                  | Twelve registered scanners                           |
+| Scanner inventory    | Ten registered scanners                  | Twelve registered scanners                           |
 | Enforcement          | Advisory                                  | Policy-driven                                        |
 | Git commit blocking  | No                                        | Not directly; repository rules can require CI checks |
 | Reporting            | HTML, normalized JSON, ZIP                | CI reports and workflow artifacts                    |
@@ -481,3 +481,5 @@ Additional technical documentation:
 - [CI Quality Gate](../CI/README.md)
 
 These documents should be maintained together whenever scanner behavior, configuration, or reporting contracts change.
+
+Trivy requires the `trivy` executable on PATH and scans filesystem vulnerabilities, misconfigurations and secrets. Missing or invalid execution is an error.

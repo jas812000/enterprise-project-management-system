@@ -46,9 +46,14 @@ Trivy JSON Structure (filesystem scan):
 
 import json
 from pathlib import Path
-
+from quality.shared.artifact_io import (
+    load_json_artifact,
+    prepare_artifact,
+    record_findings,
+)
 from ..schemas import base_tool_result
 from ..utils import determine_max_severity
+
 
 SEVERITY_MAP: dict[str, str] = {
     "critical": "critical",
@@ -57,6 +62,172 @@ SEVERITY_MAP: dict[str, str] = {
     "low":      "low",
     "unknown":  "info",
 }
+
+
+def _extract_scan_results(data: dict) -> list:
+    """Validate and extract Trivy scan results."""
+    if not isinstance(data, dict) or "Results" not in data:
+        raise ValueError("Missing Trivy Results")
+
+    scan_results = data["Results"]
+
+    if scan_results is None and data.get("SchemaVersion") == 2:
+        scan_results = []
+
+    if not isinstance(scan_results, list):
+        raise ValueError("Invalid Trivy Results")
+
+    return scan_results
+
+
+def _build_vulnerability(target: str, vuln: dict) -> dict:
+    """Normalize a Trivy vulnerability finding."""
+    native_sev = (vuln.get("Severity") or "UNKNOWN").lower()
+    severity = SEVERITY_MAP.get(native_sev, "info")
+
+    return {
+        "file": target,
+        "line": 0,
+        "column": 0,
+        "severity": severity,
+        "native_severity": vuln.get("Severity", "UNKNOWN"),
+        "rule": vuln.get("VulnerabilityID", "unknown"),
+        "message": (
+            f"{vuln.get('PkgName', 'unknown')} "
+            f"{vuln.get('InstalledVersion', '')} — "
+            f"{vuln.get('Title', vuln.get('Description', ''))}"
+        ).strip(),
+        "metadata": {
+            "package": vuln.get("PkgName", ""),
+            "installed_version": vuln.get("InstalledVersion", ""),
+            "fixed_version": vuln.get("FixedVersion", ""),
+            "cve": vuln.get("VulnerabilityID", ""),
+        },
+    }
+
+
+def _parse_vulnerabilities(scan_result: dict, target: str) -> list:
+    """Validate and normalize vulnerability findings."""
+    vulnerabilities = scan_result.get("Vulnerabilities")
+
+    if vulnerabilities is None:
+        vulnerabilities = []
+
+    if not isinstance(vulnerabilities, list):
+        raise ValueError("Invalid Trivy vulnerabilities")
+
+    return [
+        _build_vulnerability(target, vuln)
+        for vuln in vulnerabilities
+    ]
+
+
+def _build_security_finding(
+    target: str,
+    entry: dict,
+    category: str,
+    rule_key: str,
+) -> dict:
+    """Normalize a misconfiguration or redacted secret finding."""
+    if not isinstance(entry, dict):
+        raise ValueError("Invalid Trivy finding")
+
+    native = entry.get("Severity") or "UNKNOWN"
+    severity = SEVERITY_MAP.get(native.lower(), "info")
+
+    message = (
+        "Potential secret detected (redacted)"
+        if category == "Secrets"
+        else "Configuration security finding"
+    )
+
+    return {
+        "file": target,
+        "line": 0,
+        "column": 0,
+        "severity": severity,
+        "native_severity": native,
+        "rule": entry.get(rule_key, "unknown"),
+        "message": message,
+        "metadata": {
+            "category": category,
+        },
+    }
+
+
+def _parse_security_findings(scan_result: dict, target: str) -> list:
+    """Validate and normalize misconfiguration and secret findings."""
+    findings = []
+
+    categories = (
+        ("Misconfigurations", "ID"),
+        ("Secrets", "RuleID"),
+    )
+
+    for category, rule_key in categories:
+        entries = scan_result.get(category)
+
+        if entries is None:
+            continue
+
+        if not isinstance(entries, list):
+            raise ValueError("Invalid Trivy finding list")
+
+        findings.extend(
+            _build_security_finding(
+                target,
+                entry,
+                category,
+                rule_key,
+            )
+            for entry in entries
+        )
+
+    return findings
+
+
+def _collect_findings(scan_results: list, severity_counts: dict) -> list:
+    """Collect normalized findings and update severity counts."""
+    findings = []
+
+    for scan_result in scan_results:
+        target = scan_result.get("Target", "unknown")
+
+        module_findings = _parse_vulnerabilities(
+            scan_result,
+            target,
+        )
+
+        module_findings.extend(
+            _parse_security_findings(scan_result, target)
+        )
+
+        for finding in module_findings:
+            severity_counts[finding["severity"]] += 1
+
+        findings.extend(module_findings)
+
+    return findings
+
+
+def _apply_coverage(data: dict, result: dict) -> None:
+    """Validate and preserve optional local scanner coverage metadata."""
+    if "LocalCoverage" not in data:
+        return
+
+    coverage = data["LocalCoverage"]
+
+    if (
+        not isinstance(coverage, dict)
+        or set(coverage) != {"vuln", "misconfig", "secret"}
+        or any(
+            value not in ("observed", "unknown")
+            for value in coverage.values()
+        )
+    ):
+        raise ValueError("Invalid coverage")
+
+    result["metadata"]["coverage"] = coverage
 
 
 def parse_trivy(raw_dir: Path) -> dict:
@@ -72,67 +243,40 @@ def parse_trivy(raw_dir: Path) -> dict:
     Contract:
         - Always returns a base_tool_result structure.
         - Never raises exceptions outward.
-        - Missing artifact → artifact_present=False, runtime_error=True.
-        - Malformed JSON   → runtime_error=True, error in metadata.
-        - Empty Results [] → valid result with zero violations.
+        - Missing artifact: artifact_present=False, runtime_error=True.
+        - Malformed JSON: runtime_error=True, error in metadata.
+        - Empty Results: valid result with zero violations.
     """
-    result   = base_tool_result("trivy")
+    result = base_tool_result("trivy")
     artifact = raw_dir / "trivy.json"
 
-    if not artifact.exists():
-        result["artifact_present"] = False
-        result["runtime_error"]    = True
+    if not prepare_artifact(result, artifact):
         return result
 
-    result["artifact_present"] = True
-    result["executed"]         = True
-
     try:
-        with open(artifact, encoding="utf-8") as file_handle:
-            data = json.load(file_handle)
+        data = load_json_artifact(artifact)
 
-        findings  = []
-        scan_results = data.get("Results", [])
+        scan_results = _extract_scan_results(data)
 
-        for scan_result in scan_results:
-            target          = scan_result.get("Target", "unknown")
-            vulnerabilities = scan_result.get("Vulnerabilities") or []
+        findings = _collect_findings(
+            scan_results,
+            result["severity_counts"],
+        )
 
-            for vuln in vulnerabilities:
-                native_sev = (vuln.get("Severity") or "UNKNOWN").lower()
-                norm_sev   = SEVERITY_MAP.get(native_sev, "info")
-                result["severity_counts"][norm_sev] += 1
+        _apply_coverage(data, result)
 
-                findings.append({
-                    "file":             target,
-                    "line":             0,
-                    "column":           0,
-                    "severity":         norm_sev,
-                    "native_severity":  vuln.get("Severity", "UNKNOWN"),
-                    "rule":             vuln.get("VulnerabilityID", "unknown"),
-                    "message": (
-                        f"{vuln.get('PkgName', 'unknown')} "
-                        f"{vuln.get('InstalledVersion', '')} — "
-                        f"{vuln.get('Title', vuln.get('Description', ''))}"
-                    ).strip(),
-                    "metadata": {
-                        "package":           vuln.get("PkgName", ""),
-                        "installed_version": vuln.get("InstalledVersion", ""),
-                        "fixed_version":     vuln.get("FixedVersion", ""),
-                        "cve":               vuln.get("VulnerabilityID", ""),
-                    },
-                })
-
-        result["findings"]        = findings
-        result["violation_count"] = len(findings)
-        result["max_severity"]    = determine_max_severity(result["severity_counts"])
+        record_findings(
+            result,
+            findings,
+            determine_max_severity(result["severity_counts"]),
+        )
 
     except json.JSONDecodeError as error:
-        result["runtime_error"]     = True
+        result["runtime_error"] = True
         result["metadata"]["error"] = f"JSON parse error: {error}"
-    # Preserve the parser contract for unexpected failures.
-    except Exception as error:  # pylint: disable=broad-except
-        result["runtime_error"]     = True
-        result["metadata"]["error"] = f"Unexpected error: {error}"
+
+    except Exception:  # pylint: disable=broad-except
+        result["runtime_error"] = True
+        result["metadata"]["error"] = "Invalid Trivy report structure"
 
     return result
