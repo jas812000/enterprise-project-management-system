@@ -565,3 +565,68 @@ and security-sensitive database objects require their own validation.
 - `docs/logical-database-design.md`
 - `docs/database-decision-register.md`
 - `docs/database-naming-conventions.md`
+
+## 11. Local migration management utility (Phase 12 B5.4)
+
+The standard operator entry point is `tools/database/migrate.py` from the
+repository root. See the [utility README](../tools/database/README.md) and
+[developer rules](developer-rules.md). The underlying Maven commands in section
+4 remain available for reviewed manual operations. Normal application startup
+never applies migrations.
+
+The utility supports `--info`, `--dry-run` (default), `--apply`, `--validate`,
+and `--audit`. Applying migrations requires `--backup-confirmed`. For approved
+protected-owner migrations, add `--allow-elevation --admin-user <login>`; the
+operator must explicitly confirm and provide the administrator password through
+a non-echoing prompt. Required roles are preprovisioned separately.
+
+V13 transfers ownership to `epms_rbac_function_owner`; V15 to
+`epms_bootstrap_owner`; V17–V20, V22 and V24 establish or modify functions owned
+by `epms_auth_function_owner`. On PostgreSQL 18, SET membership permits owner
+transfer, while INHERIT membership permits subsequent owner-only modifications
+without a separate SET ROLE. The utility temporarily grants both options and
+schema CREATE to the required owner roles, then revokes only those grants and
+verifies cleanup. Required schema USAGE must remain available.
+
+Before each new migration, review and extend the explicit prerequisite manifest
+with its SHA-256 and required owners. Never rewrite previously applied SQL.
+If a recovery journal remains in Downloads, stop migrations and reconcile the
+recorded temporary grants as an administrator, then audit. The utility does
+not automate role creation, Flyway repair, destructive recovery, or production
+deployment. For normal application startup, continue excluding migration
+credentials as described in section 5.2.
+
+Local V33 migration, Flyway validation, removal of temporary bootstrap and
+authentication owner grants, and Spring Boot startup were verified on
+November 25, 2026. This does not establish production readiness or resolve the
+intermittent V31 transaction-validation finding.
+
+### Routine migrations
+
+From the EPMS repository root, after reviewing the pending migration declarations:
+
+```zsh
+python3 tools/database/migrate.py --dry-run
+
+python3 tools/database/migrate.py --apply --backup-confirmed
+```
+
+Confirm a restorable backup before using `--backup-confirmed`. The apply operation
+performs post-migration validation and privilege auditing.
+
+### Specialized security migrations
+
+When a reviewed migration requires protected function ownership privileges:
+
+```zsh
+python3 tools/database/migrate.py --apply --backup-confirmed --allow-elevation --admin-user james_stevens
+```
+
+The utility requires explicit authorization and prompts for the administrator
+password without displaying it when temporary elevation is necessary. Verify
+cleanup; if cleanup fails, follow the recovery journal and audit before continuing.
+Never permanently elevate application or migration roles for convenience.
+
+### Consolidated migration preflight
+
+The dry run reports all detected role/schema and membership boundary violations together before blocking migration. Missing roles are reported separately. Review and reconcile each finding using the authorized provisioning procedure; the utility never automatically revokes pre-existing privileges.
