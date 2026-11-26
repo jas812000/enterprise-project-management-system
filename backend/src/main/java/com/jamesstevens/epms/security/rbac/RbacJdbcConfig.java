@@ -17,7 +17,7 @@ public class RbacJdbcConfig {
 
     private HikariDataSource restrictedPool;
 
-    @Bean(name = "rbacJdbcTemplate")
+    @Bean(name = "rbacJdbcTemplate", defaultCandidate = false)
     /* default */ JdbcTemplate rbacJdbcTemplate(
             @Value("${epms.rbac.jdbc-url}") String url,
             @Value("${epms.rbac.username}") String username,

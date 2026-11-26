@@ -121,7 +121,8 @@ class RbacDatabaseAuthorizationIntegrationTest {
 
     @Test
     void orgAdminCanAssignOperationalRoleButCannotAssignAuditor() {
-        assertNotNull(assign(orgAdmin, target, "TEAM_LEAD"));
+        assertNotNull(assign(orgAdmin, target, "PROJECT_MANAGER"));
+        assertThrows(DataAccessException.class, () -> assign(orgAdmin, target, "TEAM_LEAD"));
         assertThrows(DataAccessException.class, () -> assign(orgAdmin, target, "AUDITOR"));
     }
 

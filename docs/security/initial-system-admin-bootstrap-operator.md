@@ -13,3 +13,12 @@
 - Password screening needs an available provider; outages must fail closed. Never override this requirement to get the initial administrator created.
 - Process acceptance should run only against isolated disposable databases; the production invocation requires a separate operator runbook and explicit authorization.
 - Do not print database credentials, administrator passwords, password hashes, SQL parameter values, or exception stack traces to operator output or test reports.
+
+## Related database migration procedure
+
+Before V15, provision the restricted `epms_bootstrap_owner` and
+`epms_bootstrap_runtime` identities using an authorized administrator. Use
+[the migration utility](../../tools/database/README.md) for reviewed temporary
+owner grants and verification of cleanup. The utility never runs this bootstrap
+CLI or sets a bootstrap password. Bootstrap process acceptance and explicit
+operator authorization remain separate requirements.

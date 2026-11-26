@@ -33,6 +33,7 @@ class RbacDatasourceBoundaryTest {
                 "rbacJdbcTemplate", String.class, String.class, String.class);
         Bean bean = method.getAnnotation(Bean.class);
         assertNotNull(bean);
+        assertFalse(bean.defaultCandidate());
         assertArrayEquals(new String[]{"rbacJdbcTemplate"}, bean.name());
         assertEquals(org.springframework.jdbc.core.JdbcTemplate.class, method.getReturnType());
         assertEquals(1, java.util.Arrays.stream(RbacJdbcConfig.class.getDeclaredMethods())

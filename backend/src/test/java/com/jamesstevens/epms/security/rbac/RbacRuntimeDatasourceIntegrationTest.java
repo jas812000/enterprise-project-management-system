@@ -45,6 +45,18 @@ class RbacRuntimeDatasourceIntegrationTest {
     @Qualifier("dataSource")
     javax.sql.DataSource applicationDataSource;
 
+    @Autowired
+    JdbcTemplate defaultTemplate;
+
+    @Test
+    void defaultTemplateUsesApplicationDatasource() {
+        assertSame(applicationDataSource, defaultTemplate.getDataSource());
+        assertNotSame(restricted, defaultTemplate);
+        assertNotEquals("epms_rbac_runtime", defaultTemplate.queryForObject("SELECT current_user", String.class));
+        assertEquals(application().queryForObject("SELECT current_user", String.class),
+                defaultTemplate.queryForObject("SELECT current_user", String.class));
+    }
+
     private JdbcTemplate application() {
         return new JdbcTemplate(applicationDataSource);
     }
