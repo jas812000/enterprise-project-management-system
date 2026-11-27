@@ -44,6 +44,46 @@ Actions `quality-gate` check and a pull request. Local success does not replace 
 - `postman/` — Postman API collections
 - `.github/` — GitHub configuration and workflows
 
+## Daily Development Procedures
+
+The iMac and MacBook Pro use the same EPMS source code on DevDrive
+and the same PostgreSQL database on the encrypted DevDatabase volume.
+
+### Starting the Workday
+
+1. Connect the external SSD and unlock DevDatabase if prompted.
+2. Start Docker Desktop and wait until Docker is running.
+3. Start the shared PostgreSQL database:
+
+   ```zsh
+   python3 /Volumes/DevDatabase/database.py start
+   ```
+
+4. Confirm that PostgreSQL is running.
+5. Open IntelliJ and begin development.
+
+### Ending the Workday
+
+1. Save all changes and finish running tests and Quality Gates.
+2. Stop EPMS and close IntelliJ.
+3. Shut down the shared PostgreSQL database:
+
+   ```zsh
+   python3 /Volumes/DevDatabase/database.py stop
+   ```
+
+4. Confirm that PostgreSQL has stopped cleanly.
+5. Safely eject all volumes on the external SSD before disconnecting it.
+
+**Important:** Never disconnect the external SSD while PostgreSQL is
+running. Do not start PostgreSQL through Homebrew services.
+
+### Database Status (Optional)
+
+```zsh
+python3 /Volumes/DevDatabase/database.py status
+```
+
 ## Documentation
 
 EPMS technical documentation is maintained in the `docs/` directory.
